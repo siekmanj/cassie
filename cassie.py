@@ -33,7 +33,7 @@ class CassieEnv_v2:
     state_est_size = 46
 
     clock_size    = 2
-    ref_traj_size = 40
+    ref_traj_size = 20
 
     speed_size     = 1
 
@@ -448,7 +448,8 @@ class CassieEnv_v2:
       self.state_history.insert(0, state)
       self.state_history = self.state_history[:self.history+1]
 
-      return np.concatenate(self.state_history)
+      state = np.concatenate(self.state_history)
+      return state
 
   def get_omniscient_state(self):
       full_state = self.get_full_state()
