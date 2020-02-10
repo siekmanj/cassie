@@ -109,7 +109,7 @@ def run_udp(args):
   state_log  = [] # cassie state
   target_log = [] #PD target log
 
-  clock_based = env.clock_based
+  clock_based = env.clock
   no_delta = env.no_delta
 
   u = pd_in_t()
@@ -162,7 +162,7 @@ def run_udp(args):
   phase_add = 1
   speed = 0
 
-  max_speed = 5
+  max_speed = 1
   min_speed = -1
   max_y_speed = 0.0
   min_y_speed = 0.0
@@ -187,7 +187,7 @@ def run_udp(args):
       if platform.node() == 'cassie':
 
         # Radio control
-        orient_add -= state.radio.channel[3] / 60.0
+        orient_add -= state.radio.channel[1] / 60.0
 
         # Reset orientation on STO
         if state.radio.channel[8] < 0:
@@ -212,7 +212,7 @@ def run_udp(args):
         else:
             sto = False
 
-        if state.radio.channel[16] < 0 and hasattr(policy, 'init_hidden_state'):
+        if state.radio.channel[15] < 0 and hasattr(policy, 'init_hidden_state'):
             print("(TOGGLE SWITCH) RESETTING HIDDEN STATES TO ZERO!")
             policy.init_hidden_state()
 
@@ -226,11 +226,11 @@ def run_udp(args):
           operation_mode = 0
 
         curr_max = max_speed / 2
-        speed_add = (max_speed / 2) * state.radio.channel[4]
+        speed_add = 0 #(max_speed / 2)# * state.radio.channel[4]
         speed = max(min_speed, state.radio.channel[0] * curr_max + speed_add)
         speed = min(max_speed, state.radio.channel[0] * curr_max + speed_add)
 
-        #print('\t' + str(state.radio.channel[5]))
+        print('\tCH4: ' + str(state.radio.channel[4]/3), 'CH5: ' + str(state.radio.channel[5]/3))
         phase_add = 1 # + state.radio.channel[5]
       else:
         # Automatically change orientation and speed
@@ -255,7 +255,12 @@ def run_udp(args):
         speed = min(max_speed, speed)
 
       #------------------------------- Normal Walking ---------------------------
-      if operation_mode == 0:
+      if operation_mode == 0 or operation_mode == 1:
+          if operation_mode == 1:
+            if hasattr(policy, 'init_hidden_state'):
+              print("RESETTING HIDDEN STATES TO ZERO!")
+              policy.init_hidden_state()
+
           #print("speed: {:3.2f} | orientation {:3.2f}".format(speed, orient_add), end='\r')
           print("\tspeed: {:3.2f} | orientation {:3.2f}".format(speed, orient_add))
           
@@ -266,10 +271,20 @@ def run_udp(args):
               u.rightLeg.motorPd.pGain[i] = env.P[i]
               u.rightLeg.motorPd.dGain[i] = env.D[i]
 
+          #print("EST PELVIS ORIENT: ", quaternion2euler(state.pelvis.orientation[:]))
           clock = [np.sin(2 * np.pi *  phase / 27), np.cos(2 * np.pi *  phase / 27)]
+          #quaternion = euler2quat(z=orient_add, y=state.radio.channel[4]/3, x=state.radio.channel[5]/3)
+
+          # Quat before bias modification
           quaternion = euler2quat(z=orient_add, y=0, x=0)
           iquaternion = inverse_quaternion(quaternion)
           new_orient = quaternion_product(iquaternion, state.pelvis.orientation[:])
+          
+          # Adding bias to quat (ROLL PITCH YAW)
+          #euler_orient = quaternion2euler(new_orient) + [state.radio.channel[4]/3, state.radio.channel[5]/3, 0]
+          euler_orient = quaternion2euler(new_orient) + [0, -0.13, 0]
+          new_orient = euler2quat(z=euler_orient[2], y=euler_orient[1], x=euler_orient[0])
+
           if new_orient[0] < 0:
               new_orient = -new_orient
           new_translationalVelocity = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
@@ -292,7 +307,7 @@ def run_udp(args):
           RL_state = np.concatenate([robot_state, ext_state])
           
           #pretending the height is always 1.0
-          RL_state[0] = 1.0
+          #RL_state[0] = 1.0
           
           # Construct input vector
           torch_state = torch.Tensor(RL_state)
@@ -320,24 +335,26 @@ def run_udp(args):
               input_log.append(RL_state)
               output_log.append(env_action)
               target_log.append(target)
-      #------------------------------- Start Up Standing ---------------------------
-      elif operation_mode == 1:
-          print('Startup Standing. Height = ' + str(standing_height))
-          #Do nothing
-          # Reassign with new multiplier on damping
-          for i in range(5):
-              u.leftLeg.motorPd.pGain[i] = 0.0
-              u.leftLeg.motorPd.dGain[i] = 0.0
-              u.rightLeg.motorPd.pGain[i] = 0.0
-              u.rightLeg.motorPd.dGain[i] = 0.0
+          """
+          #------------------------------- Start Up Standing ---------------------------
+          elif operation_mode == 1:
+              print('Startup Standing. Height = ' + str(standing_height))
+              #Do nothing
+              # Reassign with new multiplier on damping
+              for i in range(5):
+                  u.leftLeg.motorPd.pGain[i] = 0.0
+                  u.leftLeg.motorPd.dGain[i] = 0.0
+                  u.rightLeg.motorPd.pGain[i] = 0.0
+                  u.rightLeg.motorPd.dGain[i] = 0.0
 
-          # Send action
-          for i in range(5):
-              u.leftLeg.motorPd.pTarget[i] = 0.0
-              u.rightLeg.motorPd.pTarget[i] = 0.0
-          cassie.send_pd(u)
+              # Send action
+              for i in range(5):
+                  u.leftLeg.motorPd.pTarget[i] = 0.0
+                  u.rightLeg.motorPd.pTarget[i] = 0.0
+              cassie.send_pd(u)
 
-      #------------------------------- Shutdown Damping ---------------------------
+          """
+          #------------------------------- Shutdown Damping ---------------------------
       elif operation_mode == 2:
 
           print('Shutdown Damping. Multiplier = ' + str(D_mult))
