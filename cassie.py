@@ -35,7 +35,7 @@ class CassieEnv_v2:
     clock_size    = 2
     ref_traj_size = 40
 
-    speed_size     = 1
+    speed_size     = 2
 
     if clock: # Use clock inputs
       if self.state_est:
@@ -99,6 +99,8 @@ class CassieEnv_v2:
     self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
 
     self.speed = 0
+    self.y_speed = 0
+
     # maybe make ref traj only send relevant idxs?
     ref_pos, ref_vel = self.get_ref_state(self.phase)
     self.phase_add = 1
@@ -288,6 +290,7 @@ class CassieEnv_v2:
 
       #self.speed = (random.randint(0, 10)) / 10
       self.speed = np.random.uniform(-0.15, 0.8)
+      self.y_speed = np.random.uniform(-0.1, 0.1)
 
       # maybe make ref traj only send relevant idxs?
       #ref_pos, ref_vel = self.get_ref_state(self.phase)
@@ -325,12 +328,12 @@ class CassieEnv_v2:
           joint_error += 30 * weight[i] * (target - actual) ** 2
 
       forward_diff = np.abs(qvel[0] - self.speed)
-      if forward_diff < 0.05:
-         forward_diff = 0
+      #if forward_diff < 0.05:
+      #   forward_diff = 0
 
-      y_vel = np.abs(qvel[1])
-      if y_vel < 0.03:
-        y_vel = 0
+      y_vel = np.abs(qvel[1] - self.side_speed)
+      #if y_vel < 0.03:
+      #  y_vel = 0
 
       straight_diff = np.abs(qpos[1])
       if straight_diff < 0.05:
@@ -416,10 +419,10 @@ class CassieEnv_v2:
         clock = [np.sin(2 * np.pi *  self.phase / self.phaselen),
                  np.cos(2 * np.pi *  self.phase / self.phaselen)]
         
-        ext_state = np.concatenate((clock, [self.speed]))
+        ext_state = np.concatenate((clock, [self.speed, self.y_speed]))
 
       else:
-        ext_state = np.concatenate([ref_pos[self.pos_idx], ref_vel[self.vel_idx],  [self.speed]])
+        ext_state = np.concatenate([ref_pos[self.pos_idx], ref_vel[self.vel_idx],  [self.speed, self.y_speed]])
 
       pelvis_xyz = quaternion2euler(self.cassie_state.pelvis.orientation) + [self.roll_bias, self.pitch_bias, 0]
       pelvis_quat = euler2quat(z=pelvis_xyz[2], y=pelvis_xyz[1], x=pelvis_xyz[0])
