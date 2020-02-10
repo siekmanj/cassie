@@ -1,8 +1,10 @@
 # Consolidated Cassie environment.
 try:
   from .cassiemujoco import pd_in_t, state_out_t, CassieSim, CassieVis
+  from .trajectory import CassieTrajectory
 except ImportError:
   from cassiemujoco import pd_in_t, state_out_t, CassieSim, CassieVis
+  from trajectory import CassieTrajectory
 
 try:
   from .udp import euler2quat, quaternion_product, inverse_quaternion, quaternion2euler
