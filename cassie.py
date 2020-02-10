@@ -1,7 +1,13 @@
 # Consolidated Cassie environment.
-from .cassiemujoco import pd_in_t, state_out_t, CassieSim, CassieVis
+try:
+  from .cassiemujoco import pd_in_t, state_out_t, CassieSim, CassieVis
+except ImportError:
+  from cassiemujoco import pd_in_t, state_out_t, CassieSim, CassieVis
 
-from .udp import euler2quat, quaternion_product, inverse_quaternion, quaternion2euler
+try:
+  from .udp import euler2quat, quaternion_product, inverse_quaternion, quaternion2euler
+except ImportError:
+  from udp import euler2quat, quaternion_product, inverse_quaternion, quaternion2euler
 
 from math import floor
 

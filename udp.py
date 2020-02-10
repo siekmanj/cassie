@@ -8,8 +8,14 @@ import datetime
 
 import select, termios, tty
 
-from cassie.cassiemujoco.cassieUDP import *
-from cassie.cassiemujoco.cassiemujoco_ctypes import *
+#from cassie.cassiemujoco.cassieUDP import *
+#from cassie.cassiemujoco.cassiemujoco_ctypes import *
+try:
+  from .cassiemujoco.cassieUDP import *
+  from .cassiemujoco.cassiemujoco_ctypes import *
+except ImportError:
+  from cassiemujoco.cassieUDP import *
+  from cassiemujoco.cassiemujoco_ctypes import *
 
 import numpy as np
 
