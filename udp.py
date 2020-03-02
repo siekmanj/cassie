@@ -8,6 +8,8 @@ import datetime
 
 import select, termios, tty
 
+bias_idx = 4
+
 #from cassie.cassiemujoco.cassieUDP import *
 #from cassie.cassiemujoco.cassiemujoco_ctypes import *
 try:
@@ -165,13 +167,22 @@ def run_udp(args):
                    # Might be worth tuning by joint but something else if probably needed
   phase = 0
   counter = 0
-  phase_add = 1
+  phase_add = env.simrate
   speed = 0
+  side_speed = 0
 
-  max_speed = 1
-  min_speed = -1
-  max_y_speed = 0.0
-  min_y_speed = 0.0
+  max_speed = 2.0
+  min_speed = -0.3
+  max_y_speed = 0.25
+  min_y_speed = -0.25
+
+  joint_bias = 0.0
+  joint_bias = 0.0
+
+  pitch_bias = 0
+  roll_bias = 0
+
+  delay = 30
 
   old_settings = termios.tcgetattr(sys.stdin)
 
@@ -193,7 +204,7 @@ def run_udp(args):
       if platform.node() == 'cassie':
 
         # Radio control
-        orient_add -= state.radio.channel[1] / 60.0
+        orient_add -= state.radio.channel[3] / 60.0
 
         # Reset orientation on STO
         if state.radio.channel[8] < 0:
@@ -225,19 +236,24 @@ def run_udp(args):
         # Switch the operation mode based on the toggle next to STO
         if state.radio.channel[9] < -0.5: # towards operator means damping shutdown mode
             operation_mode = 2
-        elif state.radio.channel[9] > 0.5: # away from the operator means that standing pose
+        elif state.radio.channel[9] > 0.5: # away from the operator means zero hidden states
           operation_mode = 1
-          standing_height = MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT)*0.5*(state.radio.channel[6] + 1)
         else:                               # Middle means normal walking
           operation_mode = 0
 
-        curr_max = max_speed / 2
-        speed_add = 0 #(max_speed / 2)# * state.radio.channel[4]
-        speed = max(min_speed, state.radio.channel[0] * curr_max + speed_add)
-        speed = min(max_speed, state.radio.channel[0] * curr_max + speed_add)
+        #raw_spd = (state.radio.channel[6] + 1)/2 + state.radio.channel[0]/5
+        raw_spd = state.radio.channel[0]
+        speed = raw_spd * max_speed if raw_spd > 0 else -raw_spd * min_speed
 
-        print('\tCH4: ' + str(state.radio.channel[4]/3), 'CH5: ' + str(state.radio.channel[5]/3))
-        phase_add = 1 # + state.radio.channel[5]
+        raw_side_spd = -state.radio.channel[1]
+        side_speed = raw_side_spd * max_y_speed if raw_side_spd > 0 else -raw_side_spd * min_y_speed
+
+        phase_add = env.simrate #+ env.simrate * (state.radio.channel[7] + 0.75)/2
+
+        joint_bias = state.radio.channel[6]/2
+        joint_bias = state.radio.channel[7]/2
+
+        pitch_bias = state.radio.channel[5]/6
       else:
         # Automatically change orientation and speed
         tt = time.monotonic() - t0
@@ -248,17 +264,43 @@ def run_udp(args):
             speed += 0.1
           if c == 's':
             speed -= 0.1
-          if c == 'a':
+          if c == 'q':
             orient_add -= 0.1
-          if c == 'd':
+          if c == 'e':
             orient_add += 0.1
+          if c == 'a':
+            side_speed -= 0.05
+          if c == 'd':
+            side_speed += 0.05
           if c == 'r':
             speed = 0.5
             orient_add = 0
+            side_speed = 0
+          if c == 't':
+            phase_add += 5
+          if c == 'g':
+            phase_add -= 5
+          if c == 'z':
+            joint_bias += 0.01
+            joint_bias += 0.01
+          if c == 'x':
+            joint_bias -= 0.01
+            joint_bias -= 0.01
+          if c == 'p':
+            pitch_bias += 0.01
+          if c == 'l':
+            pitch_bias -= 0.01
 
 
         speed = max(min_speed, speed)
         speed = min(max_speed, speed)
+
+        side_speed = max(min_y_speed, side_speed)
+        side_speed = min(max_y_speed, side_speed)
+
+        #env.calc_stepping_freq(speed)
+
+        #phase_add = env.stepping_freq
 
       #------------------------------- Normal Walking ---------------------------
       if operation_mode == 0 or operation_mode == 1:
@@ -267,8 +309,6 @@ def run_udp(args):
               print("RESETTING HIDDEN STATES TO ZERO!")
               policy.init_hidden_state()
 
-          #print("speed: {:3.2f} | orientation {:3.2f}".format(speed, orient_add), end='\r')
-          print("\tspeed: {:3.2f} | orientation {:3.2f}".format(speed, orient_add))
           
           # Reassign because it might have been changed by the damping mode
           for i in range(5):
@@ -277,9 +317,7 @@ def run_udp(args):
               u.rightLeg.motorPd.pGain[i] = env.P[i]
               u.rightLeg.motorPd.dGain[i] = env.D[i]
 
-          #print("EST PELVIS ORIENT: ", quaternion2euler(state.pelvis.orientation[:]))
-          clock = [np.sin(2 * np.pi *  phase / 27), np.cos(2 * np.pi *  phase / 27)]
-          #quaternion = euler2quat(z=orient_add, y=state.radio.channel[4]/3, x=state.radio.channel[5]/3)
+          clock = [np.sin(2 * np.pi *  phase / len(env.trajectory)), np.cos(2 * np.pi *  phase / len(env.trajectory))]
 
           # Quat before bias modification
           quaternion = euler2quat(z=orient_add, y=0, x=0)
@@ -287,19 +325,52 @@ def run_udp(args):
           new_orient = quaternion_product(iquaternion, state.pelvis.orientation[:])
           
           # Adding bias to quat (ROLL PITCH YAW)
-          #euler_orient = quaternion2euler(new_orient) + [state.radio.channel[4]/3, state.radio.channel[5]/3, 0]
-          euler_orient = quaternion2euler(new_orient) + [0, -0.13, 0]
+          euler_orient = quaternion2euler(new_orient) + [0, pitch_bias, 0]
           new_orient = euler2quat(z=euler_orient[2], y=euler_orient[1], x=euler_orient[0])
 
+          left_foot_pos = state.motor.position[4] #(state.motor.position[4] + state.joint.position[2])/2
+          right_foot_pos = state.motor.position[9] #(state.motor.position[9] + state.joint.position[5])/2
+
+          """
+          print("{:6s}".format(" "), end="")
+          for y in range(6):
+            print("{:6d}".format(y), end=", ")
+          print()
+
+          for x in range(10):
+            print("{:6d}".format(x), end=": ")
+            for y in range(6):
+              print("{:6.2f}".format(state.motor.position[x] - state.joint.position[y]), end=", ")
+            print()
+          #print("ERR: {:5.4f}, {:5.4f}".format(state.motor.position[4] - state.joint.position[2], state.motor.position[9] - state.joint.position[5]))
+          """
+
+          motor_pos = state.motor.position[:]
+          joint_pos = state.joint.position[:]
+          joint_pos[2] = left_foot_pos
+          motor_pos[4] = left_foot_pos
+          joint_pos[5] = right_foot_pos
+          motor_pos[9] = right_foot_pos
+
+          joint_diffs = [x - motor_pos[bias_idx] for x in state.joint.position[:]]
+          for x in joint_diffs[:3]:
+            print("{:3.2f}".format(x), end=", ")
+          print()
+
+          motor_pos[bias_idx]   += joint_bias
+          motor_pos[bias_idx+5] += joint_bias
+
+          print("\tspeed: {:4.2f} | sidespeed {:4.2f} | orientation {:4.2f} | clock {:4.1f} {:4.1f} | step freq {:3d} | ljoint bias {:6.4f} | rjoint bias {:6.4f} | pitch bias {:4.3f} | delay {:6.3f}".format(speed, side_speed, orient_add, clock[0], clock[1], int(phase_add), joint_bias, joint_bias, pitch_bias, delay))
           if new_orient[0] < 0:
-              new_orient = -new_orient
+              new_orient[0] = -new_orient
           new_translationalVelocity = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
               
-          ext_state = np.concatenate((clock, [speed]))
+          ext_state = np.concatenate((clock, [speed, side_speed]))
           robot_state = np.concatenate([
                   [state.pelvis.position[2] - state.terrain.height], # pelvis height
                   new_orient,                                     # pelvis orientation
-                  state.motor.position[:],                        # actuated joint positions
+                  #state.motor.position[:],                        # actuated joint positions
+                  motor_pos,
 
                   new_translationalVelocity[:],                   # pelvis translational velocity
                   state.pelvis.rotationalVelocity[:],             # pelvis rotational velocity 
@@ -307,13 +378,11 @@ def run_udp(args):
 
                   state.pelvis.translationalAcceleration[:],      # pelvis translational acceleration
                   
-                  state.joint.position[:],                        # unactuated joint positions
+                  joint_pos,
+                  #state.joint.position[:],                        # unactuated joint positions
                   state.joint.velocity[:]                         # unactuated joint velocities
           ])
           RL_state = np.concatenate([robot_state, ext_state])
-          
-          #pretending the height is always 1.0
-          #RL_state[0] = 1.0
           
           # Construct input vector
           torch_state = torch.Tensor(RL_state)
@@ -322,11 +391,17 @@ def run_udp(args):
           if no_delta:
             offset = env.offset
           else:
-            offset = env.get_ref_state(phase=phase)
+            offset = env.get_ref_state(phase=phase)[0][env.pos_idx]
 
           action = policy(torch_state)
           env_action = action.data.numpy()
           target = env_action + offset
+
+          target[bias_idx]   -= joint_bias
+          target[bias_idx+5] -= joint_bias
+
+          #target[4] -= joint_bias
+          #target[9] -= joint_bias
 
           # Send action
           for i in range(5):
@@ -383,14 +458,19 @@ def run_udp(args):
       
       # Measure delay
       # Wait until next cycle time
-      while time.monotonic() - t < 60/2000:
+      while time.monotonic() - t < 0.03:
           time.sleep(0.001)
-      print('\tdelay: {:6.1f} ms'.format((time.monotonic() - t) * 1000))
+      delay = (time.monotonic() - t) * 1000
+      #print('\tdelay: {:6.1f} ms'.format((time.monotonic() - t) * 1000))
 
       # Track phase
       phase += phase_add
-      if phase >= 28:
-          phase = 0
-          counter += 1
+      if phase >= len(env.trajectory):
+        #print("RESET:", phase, phase % len(env.trajectory) - 1)
+        phase = phase % len(env.trajectory) - 1
+        counter += 1
+      #if phase >= 28:
+      #    phase = 0
+      #    counter += 1
   finally:
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)

@@ -35,7 +35,7 @@ class CassieEnv_v2:
     clock_size    = 2
     ref_traj_size = 20
 
-    speed_size     = 1
+    speed_size     = 2
 
     if clock: # Use clock inputs
       if self.state_est:
@@ -75,19 +75,13 @@ class CassieEnv_v2:
     # TODO: should probably initialize this to current state
     self.cassie_state = state_out_t()
 
-    self.simrate = simrate # simulate X mujoco steps with same pd target
-                           # 60 brings simulation from 2000Hz to roughly 30Hz
+    #self.stepping_freq = simrate
+    self.simrate       = simrate # simulate X mujoco steps with same pd target
+                                 # 60 brings simulation from 2000Hz to roughly 30Hz
 
     self.time    = 0 # number of time steps in current episode
     self.phase   = 0 # portion of the phase the robot is in
     self.counter = 0 # number of phase cycles completed in episode
-
-    # NOTE: a reference trajectory represents ONE phase cycle
-
-    # should be floor(len(traj) / simrate) - 1
-    # should be VERY cautious here because wrapping around trajectory
-    # badly can cause assymetrical/bad gaits
-    self.phaselen = floor(len(self.trajectory) / self.simrate) - 1
 
     # see include/cassiemujoco.h for meaning of these indices
     self.pos_idx = [7, 8, 9, 14, 20, 21, 22, 23, 28, 34]
@@ -96,25 +90,39 @@ class CassieEnv_v2:
     self.pos_index = np.array([1,2,3,4,5,6,7,8,9,14,15,16,20,21,22,23,28,29,30,34])
     self.vel_index = np.array([0,1,2,3,4,5,6,7,8,12,13,14,18,19,20,21,25,26,27,31])
 
-    self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
+    self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
+    self.offset = self.default_offset
+
+    self.max_speed = 1.6
+    self.min_speed = -0.3
+
+    self.max_side_speed = 0.15
+    self.min_side_speed = -0.15
+
+    self.max_step_freq = 1.6
+    self.min_step_freq = 0.9
+
+    self.max_pitch_incline = 0.06
+    self.max_roll_incline = 0.06
+
+    self.max_foot_bias = 1.0
 
     self.speed = 0
+    self.side_speed = 0
+
     # maybe make ref traj only send relevant idxs?
     ref_pos, ref_vel = self.get_ref_state(self.phase)
-    self.phase_add = 1
 
     # Record default dynamics parameters
     self.default_damping = self.sim.get_dof_damping()
     self.default_mass = self.sim.get_body_mass()
     self.default_ipos = self.sim.get_body_ipos()
-    self.default_fric = self.sim.get_ground_friction()
+    self.default_fric = self.sim.get_geom_friction()
     self.default_rgba = self.sim.get_geom_rgba()
+    self.default_quat = self.sim.get_geom_quat()
 
-    self.critic_state = None
-
-    # This randomizes the colors of the various geoms on Cassie.
-    #colors = np.hstack([self.default_rgba[:4], [np.random.uniform(0, 1) for i in range(4, self.sim.ngeom * 4)]])
-    #self.sim.set_geom_rgba(colors)
+    self.motor_encoder_noise = np.zeros(10)
+    self.joint_encoder_noise = np.zeros(6)
 
   def step_simulation(self, action):
 
@@ -125,6 +133,9 @@ class CassieEnv_v2:
         target = action + ref_pos[self.pos_idx]
       else:
         target = action + self.offset
+
+      if self.dynamics_randomization:
+        target += self.motor_encoder_noise
       
       self.u = pd_in_t()
       for i in range(5):
@@ -147,8 +158,13 @@ class CassieEnv_v2:
 
       self.cassie_state = self.sim.step_pd(self.u)
 
-  def step(self, action): #, return_omniscient_state=False):
-      for _ in range(self.simrate):
+  def step(self, action):
+      if self.dynamics_randomization:
+        simrate = self.simrate + np.random.randint(-6, 7)
+      else:
+        simrate = self.simrate
+
+      for _ in range(simrate):
           self.step_simulation(action)
 
       height = self.sim.qpos()[2]
@@ -156,26 +172,33 @@ class CassieEnv_v2:
       self.time  += 1
       self.phase += self.phase_add
 
-      if self.phase > self.phaselen:
-          self.phase = 0
+      if self.phase >= len(self.trajectory):
+          self.phase = self.phase % len(self.trajectory) - 1
           self.counter += 1
 
       # Early termination
-      done = not(height > 0.4 and height < 3.0)
+      done = False
 
       reward = self.compute_reward()
 
-      if reward < 0.3:
+      if reward < 0.45:
           done = True
 
-      #if return_omniscient_state:
-      #  return self.get_full_state(), self.get_omniscient_state(), reward, done, {}
-      #else:
-      #  return self.get_full_state(), reward, done, {}
-      return self.get_full_state(), reward, done, {}
+      state = self.get_full_state() 
+
+      if np.random.randint(300) == 0:
+        self.speed = np.random.uniform(self.min_speed, self.max_speed)
+
+      if np.random.randint(300) == 0:
+        self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
+
+      if np.random.randint(300) == 0:
+        self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
+
+      return state, reward, done, {}
 
   def reset(self):
-      self.phase = random.randint(0, self.phaselen)
+      self.phase = random.randint(0, len(self.trajectory))
       self.time = 0
       self.counter = 0
 
@@ -189,8 +212,8 @@ class CassieEnv_v2:
       # Randomize dynamics:
       if self.dynamics_randomization:
           damp = self.default_damping
-          weak_factor = 0.5
-          strong_factor = 2.0
+          weak_factor = 0.8
+          strong_factor = 5.0
           pelvis_damp_range = [[damp[0], damp[0]], 
                                [damp[1], damp[1]], 
                                [damp[2], damp[2]], 
@@ -208,7 +231,7 @@ class CassieEnv_v2:
 
           knee_damp_range     = [[damp[12]*weak_factor, damp[12]*strong_factor]]   # 12 and 25
           shin_damp_range     = [[damp[13]*weak_factor, damp[13]*strong_factor]]   # 13 and 26
-          tarsus_damp_range   = [[damp[14], damp[14]]]             # 14 and 27
+          tarsus_damp_range   = [[damp[14]*weak_factor, damp[14]*strong_factor]]             # 14 and 27
           heel_damp_range     = [[damp[15], damp[15]]]                           # 15 and 28
           fcrank_damp_range   = [[damp[16]*weak_factor, damp[16]*strong_factor]]   # 16 and 29
           prod_damp_range     = [[damp[17], damp[17]]]                           # 17 and 30
@@ -218,8 +241,8 @@ class CassieEnv_v2:
           damp_range = pelvis_damp_range + side_damp + side_damp
           damp_noise = [np.random.uniform(a, b) for a, b in damp_range]
 
-          hi = 1.5
-          lo = 0.5
+          lo = 0.7
+          hi = 1.3
           m = self.default_mass
           pelvis_mass_range      = [[lo*m[1],  hi*m[1]]]  # 1
           hip_mass_range         = [[lo*m[2],  hi*m[2]],  # 2->4 and 14->16
@@ -245,58 +268,53 @@ class CassieEnv_v2:
           mass_range = [[0, 0]] + pelvis_mass_range + side_mass + side_mass
           mass_noise = [np.random.uniform(a, b) for a, b in mass_range]
 
-          #delta_y_min, delta_y_max = self.default_ipos[4] - 0.03, self.default_ipos[4] + 0.03
-          #delta_z_min, delta_z_max = self.default_ipos[5] - 0.01, self.default_ipos[5] + 0.01
-          #com_noise = [0, 0, 0] + [np.random.uniform(-0.05, 0.05)] + [np.random.uniform(delta_y_min, delta_y_max)] + [np.random.uniform(delta_z_min, delta_z_max)]
-
-          #self.pitch_bias = np.random.uniform(-0.15, 0.15)
-          #self.roll_bias  = np.random.uniform(-0.01, 0.01)
           self.pitch_bias = 0.0
           self.roll_bias = 0.0
 
           delta = 0.0005
           com_noise = [0, 0, 0] + [np.random.uniform(val - delta, val + delta) for val in self.default_ipos[3:]]
 
-          #pelvis_xfrc = np.random.uniform(-10, 10)
-          #pelvis_yfrc = np.random.uniform(-5, 5)
+          fric_noise = []
+          translational = np.random.uniform(0.6, 1.1)
+          torsional = np.random.uniform(1e-4, 5e-4)
+          rolling = np.random.uniform(1e-4, 2e-4)
+          for _ in range(int(len(self.default_fric)/3)):
+            fric_noise += [translational, torsional, rolling]
 
-          #pelvis_xtrq = np.random.uniform(-3, 3)
-          #pelvis_ytrq = np.random.uniform(-1, 1)
-          #self.sim.apply_force([pelvis_xfrc, pelvis_yfrc, 0, pelvis_xtrq, pelvis_ytrq, 0], "cassie-pelvis")
+          geom_plane = [np.random.uniform(-self.max_roll_incline, self.max_roll_incline), np.random.uniform(-self.max_pitch_incline, self.max_pitch_incline), 0]
+          quat_plane   = euler2quat(z=geom_plane[2], y=geom_plane[1], x=geom_plane[0])
+          geom_quat  = list(quat_plane) + list(self.default_quat[4:])
 
-          fric_noise = [np.random.uniform(0.3, 1.4)] + [np.random.uniform(3e-3, 8e-3)] + list(self.default_fric[2:])
+          self.motor_encoder_noise = np.random.uniform(-0.04, 0.04, size=10)
+          self.joint_encoder_noise = np.random.uniform(-0.04, 0.04, size=6)
 
           self.sim.set_dof_damping(np.clip(damp_noise, 0, None))
           self.sim.set_body_mass(np.clip(mass_noise, 0, None))
           self.sim.set_body_ipos(com_noise)
-          self.sim.set_ground_friction(np.clip(fric_noise, 0, None))
+          self.sim.set_geom_friction(np.clip(fric_noise, 0, None))
+          self.sim.set_geom_quat(geom_quat)
       else:
           self.sim.set_dof_damping(self.default_damping)
           self.sim.set_body_mass(self.default_mass)
           self.sim.set_body_ipos(self.default_ipos)
-          self.sim.set_ground_friction(self.default_fric)
+          self.sim.set_geom_friction(self.default_fric)
+          self.sim.set_geom_quat(self.default_quat)
 
-          self.pitch_bias = 0.0
-          self.roll_bias = 0.0
+          self.motor_encoder_noise = np.zeros(10)
+          self.joint_encoder_noise = np.zeros(6)
 
-          #self.sim.apply_force([0, 0, 0, 0, 0, 0], 'cassie-pelvis')
 
       self.sim.set_const()
 
       # Need to reset u? Or better way to reset cassie_state than taking step
       self.cassie_state = self.sim.step_pd(self.u)
 
-      #self.speed = (random.randint(0, 10)) / 10
-      self.speed = np.random.uniform(-0.15, 0.8)
+      self.offset = self.default_offset
 
-      # maybe make ref traj only send relevant idxs?
-      #ref_pos, ref_vel = self.get_ref_state(self.phase)
+      self.speed = np.random.uniform(self.min_speed, self.max_speed)
+      self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
-      #if return_omniscient_state:
-      #  critic_state = self.get_omniscient_state()
-      #  return actor_state, critic_state
-      #else:
-      #  return actor_state
+      self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
 
       return self.get_full_state()
 
@@ -322,62 +340,61 @@ class CassieEnv_v2:
           target = ref_pos[j]
           actual = qpos[j]
 
-          joint_error += 30 * weight[i] * (target - actual) ** 2
+          joint_error += 25 * weight[i] * (target - actual) ** 2
 
-      forward_diff = np.abs(qvel[0] - self.speed)
-      if forward_diff < 0.05:
-         forward_diff = 0
+      x_vel = np.abs(qvel[0] - self.speed)
+      if x_vel < 0.04:
+         x_vel = 0
 
-      y_vel = np.abs(qvel[1])
-      if y_vel < 0.03:
+      y_vel = np.abs(qvel[1] - self.side_speed)
+      if y_vel < 0.04:
         y_vel = 0
 
-      straight_diff = np.abs(qpos[1])
-      if straight_diff < 0.05:
-        straight_diff = 0
+      #straight_diff = np.abs(qpos[1])
+      #if straight_diff < 0.05:
+      #  straight_diff = 0
 
       actual_q = qpos[3:7]
-      #target_q = ref_pos[3:7]
       target_q = [1, 0, 0, 0]
       orientation_error = 5 * (1 - np.inner(actual_q, target_q) ** 2)
 
-      foot_err = 0#3 * ((1 - np.inner(self.cassie_state.leftFoot.orientation, target_q) ** 2) + (1 - np.inner(self.cassie_state.rightFoot.orientation, target_q) ** 2))
-      #print("ferr: ", foot_err, "perr", orientation_error)
+      left_actual  = quaternion_product(qpos[3:7], self.cassie_state.leftFoot.orientation)
+      right_actual = quaternion_product(qpos[3:7], self.cassie_state.rightFoot.orientation)
 
+      left_actual_target_euler  = quaternion2euler(left_actual)  * [0, 1, 0] # ROLL PITCH YAW
+      right_actual_target_euler = quaternion2euler(right_actual) * [0, 1, 0]
+
+      left_actual_target = euler2quat(z=left_actual_target_euler[2], y=left_actual_target_euler[1], x=left_actual_target_euler[0])
+      right_actual_target = euler2quat(z=right_actual_target_euler[2], y=right_actual_target_euler[1], x=right_actual_target_euler[0])
+
+      foot_err = 4 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
+
+      foot_frc = sum(np.abs(self.sim.get_foot_forces()))/2000
 
       # left and right shin springs
       for i in [15, 29]:
           target = ref_pos[i] # NOTE: in Xie et al spring target is 0
+          #target = 0
           actual = qpos[i]
 
           spring_error += 1000 * (target - actual) ** 2      
       
-      reward = 0.100 * np.exp(-joint_error) +       \
-               0.300 * np.exp(-forward_diff) +      \
-               0.050 * np.exp(-straight_diff) +     \
-               0.200 * np.exp(-y_vel) +             \
+      reward = 0.100 * np.exp(-joint_error) +                    \
+               0.300 * np.exp(-x_vel) +                          \
+               0.200 * np.exp(-y_vel) +                          \
                0.300 * np.exp(-(orientation_error + foot_err)) + \
-               0.050 * np.exp(-spring_error)
-               #0.450 * np.exp(-com_error) +         \
+               0.050 * np.exp(-spring_error) +                   \
+               0.050 * np.exp(-foot_frc)
 
       return reward
 
   # get the corresponding state from the reference trajectory for the current phase
-  def get_ref_state(self, phase=None):
-      if phase is None:
-          phase = self.phase
+  def get_ref_state(self, phase):
+      if phase >= len(self.trajectory):
+          phase = phase % len(self.trajectory) - 1
 
-      if phase > self.phaselen:
-          phase = 0
-
-      pos = np.copy(self.trajectory.qpos[phase * self.simrate])
-
-      # this is just setting the x to where it "should" be given the number
-      # of cycles
-      # pos[0] += (self.trajectory.qpos[-1, 0] - self.trajectory.qpos[0, 0]) * self.counter
-      
-      # ^ should only matter for COM error calculation,
-      # gets dropped out of state variable for input reasons
+      #pos = np.copy(self.trajectory.qpos[phase * self.simrate])
+      pos = np.copy(self.trajectory.qpos[phase])
 
       ###### Setting variable speed  #########
       pos[0] *= self.speed
@@ -388,7 +405,7 @@ class CassieEnv_v2:
       # regardless of reference trajectory?
       pos[1] = 0
 
-      vel = np.copy(self.trajectory.qvel[phase * self.simrate])
+      vel = np.copy(self.trajectory.qvel[phase])
       vel[0] *= self.speed
 
       return pos, vel
@@ -413,22 +430,31 @@ class CassieEnv_v2:
       # line trajectories.
 
       if self.clock:
-        clock = [np.sin(2 * np.pi *  self.phase / self.phaselen),
-                 np.cos(2 * np.pi *  self.phase / self.phaselen)]
+        clock = [np.sin(2 * np.pi *  self.phase / len(self.trajectory)),
+                 np.cos(2 * np.pi *  self.phase / len(self.trajectory))]
         
-        ext_state = np.concatenate((clock, [self.speed]))
+        ext_state = np.concatenate((clock, [self.speed, self.side_speed]))
 
       else:
-        ext_state = np.concatenate([ref_pos[self.pos_idx], ref_vel[self.vel_idx],  [self.speed]])
+        ext_state = np.concatenate([ref_pos[self.pos_idx], ref_vel[self.vel_idx],  [self.speed, self.side_speed]])
 
+      self.roll_bias = 0
+      self.pitch_bias = 0
       pelvis_xyz = quaternion2euler(self.cassie_state.pelvis.orientation) + [self.roll_bias, self.pitch_bias, 0]
       pelvis_quat = euler2quat(z=pelvis_xyz[2], y=pelvis_xyz[1], x=pelvis_xyz[0])
+
+      if self.dynamics_randomization:
+        motor_pos = self.cassie_state.motor.position[:] + self.motor_encoder_noise
+        joint_pos = self.cassie_state.joint.position[:] + self.joint_encoder_noise
+      else:
+        motor_pos = self.cassie_state.motor.position[:]
+        joint_pos = self.cassie_state.joint.position[:]
 
       # Use state estimator
       robot_state = np.concatenate([
           [self.cassie_state.pelvis.position[2] - self.cassie_state.terrain.height], # pelvis height
           pelvis_quat[:],
-          self.cassie_state.motor.position[:],                                     # actuated joint positions
+          motor_pos,                                                               # actuated joint positions
 
           self.cassie_state.pelvis.translationalVelocity[:],                       # pelvis translational velocity
           self.cassie_state.pelvis.rotationalVelocity[:],                          # pelvis rotational velocity 
@@ -436,7 +462,7 @@ class CassieEnv_v2:
 
           self.cassie_state.pelvis.translationalAcceleration[:],                   # pelvis translational acceleration
           
-          self.cassie_state.joint.position[:],                                     # unactuated joint positions
+          joint_pos,                                                               # unactuated joint positions
           self.cassie_state.joint.velocity[:]                                      # unactuated joint velocities
       ])
 
@@ -450,11 +476,6 @@ class CassieEnv_v2:
 
       state = np.concatenate(self.state_history)
       return state
-
-  def get_omniscient_state(self):
-      full_state = self.get_full_state()
-      omniscient_state = np.hstack((full_state, self.sim.get_dof_damping(), self.sim.get_body_mass(), self.sim.get_body_ipos(), self.sim.get_ground_friction))
-      return omniscient_state
 
   def render(self):
       if self.vis is None:
@@ -549,5 +570,3 @@ class CassieEnv_v2:
 # [15] Right hip pitch       (Motor [7])
 # [16] Right knee            (Motor [8])
 # [17] Right shin                       (Joint [3])
-# [18] Right tarsus                     (Joint [4])
-# [19] Right foot            (Motor [9], Joint [5])

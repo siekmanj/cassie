@@ -132,15 +132,22 @@ class CassieSim:
           ret[i] = ptr[i]
         return ret
 
-    def get_ground_friction(self):
-        ptr = cassie_sim_ground_friction(self.c)
-        ret = np.zeros(3)
-        for i in range(3):
+    def get_geom_friction(self):
+        ptr = cassie_sim_geom_friction(self.c)
+        ret = np.zeros(self.ngeom * 3)
+        for i in range(self.ngeom * 3):
           ret[i] = ptr[i]
         return ret
 
     def get_geom_rgba(self):
         ptr = cassie_sim_geom_rgba(self.c)
+        ret = np.zeros(self.ngeom * 4)
+        for i in range(self.ngeom * 4):
+          ret[i] = ptr[i]
+        return ret
+
+    def get_geom_quat(self):
+        ptr = cassie_sim_geom_quat(self.c)
         ret = np.zeros(self.ngeom * 4)
         for i in range(self.ngeom * 4):
           ret[i] = ptr[i]
@@ -183,17 +190,17 @@ class CassieSim:
 
         cassie_sim_set_body_ipos(self.c, c_arr)
 
-    def set_ground_friction(self, data):
-        c_arr = (ctypes.c_double * 3)()
+    def set_geom_friction(self, data):
+        c_arr = (ctypes.c_double * (self.ngeom*3))()
 
-        if len(data) != 3:
-           print("SIZE MISMATCH SET_GROUND_FRICTION()")
+        if len(data) != self.ngeom * 3:
+           print("SIZE MISMATCH SET_GEOM_FRICTION()")
            exit(1)
 
-        for i in range(3):
+        for i in range(self.ngeom*3):
           c_arr[i] = data[i]
 
-        cassie_sim_set_ground_friction(self.c, c_arr)
+        cassie_sim_set_geom_friction(self.c, c_arr)
 
     def set_geom_rgba(self, data):
         ngeom = self.ngeom * 4
@@ -209,6 +216,22 @@ class CassieSim:
 
         cassie_sim_set_geom_rgba(self.c, c_arr)
     
+    def set_geom_quat(self, data):
+        ngeom = self.ngeom * 4
+
+        if len(data) != ngeom:
+           print("SIZE MISMATCH SET_GEOM_QUAT()")
+           exit(1)
+
+        c_arr = (ctypes.c_double * ngeom)()
+        #print("SETTING:")
+        #print(c_arr, data)
+
+        for i in range(ngeom):
+          c_arr[i] = data[i]
+
+        cassie_sim_set_geom_quat(self.c, c_arr)
+
     def set_const(self):
         cassie_sim_set_const(self.c)
 
