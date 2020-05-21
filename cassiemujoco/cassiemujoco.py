@@ -88,13 +88,6 @@ class CassieSim:
             xfrc_array[i] = xfrc[i]
         cassie_sim_apply_force(self.c, xfrc_array, body)
 
-    def foot_force(self, force):
-        frc_array = (ctypes.c_double * 12)()
-        cassie_sim_foot_forces(self.c, frc_array)
-        for i in range(12):
-            force[i] = frc_array[i]
-        #print(force)
-
     def foot_pos(self, pos):
         pos_array = (ctypes.c_double * 6)()
         cassie_sim_foot_positions(self.c, pos_array)
@@ -104,11 +97,21 @@ class CassieSim:
     def clear_forces(self):
         cassie_sim_clear_forces(self.c)
 
+    """
     def get_foot_forces(self):
         y = state_out_t()
         force = np.zeros(12)
         self.foot_force(force)
         return force[[2, 8]]
+  """
+
+    def get_foot_force(self):
+        force = np.zeros(12)
+        frc_array = (ctypes.c_double * 12)()
+        cassie_sim_foot_forces(self.c, frc_array)
+        for i in range(12):
+            force[i] = frc_array[i]
+        return force
 
     def get_dof_damping(self):
         ptr = cassie_sim_dof_damping(self.c)
