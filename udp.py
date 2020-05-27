@@ -100,15 +100,12 @@ def check_stdin():
 def run_udp(policy_files):
   from util.env import env_factory
 
-  #policy = torch.load(args.policy)
   policies   = [torch.load(p) for p in policy_files]
   m_policies = [torch.load(p) for p in policy_files]
 
 
   legacies = ['legacy' if not (hasattr(p, 'legacy') and p.legacy == False) else '' for p in policies]
-  print(legacies)
-  #env = env_factory(policy.env_name)()
-  envs = [env_factory(p.env_name + legacy)() for p, legacy in zip(policies, legacies)]
+  envs     = [env_factory(p.env_name + legacy)() for p, legacy in zip(policies, legacies)]
 
   for i, env in enumerate(envs):
     if not env.state_est:
@@ -123,7 +120,7 @@ def run_udp(policy_files):
   input_log  = [] # network inputs
   output_log = [] # network outputs 
   state_log  = [] # cassie state
-  target_log = [] #PD target log
+  target_log = [] # PD target log
 
   env = envs[0]
   clock_based = env.clock
@@ -138,7 +135,7 @@ def run_udp(policy_files):
 
   if platform.node() == 'cassie':
       cassie = CassieUdp(remote_addr='10.10.10.3', remote_port='25010',
-                              local_addr='10.10.10.100', local_port='25011')
+                         local_addr='10.10.10.100', local_port='25011')
   else:
       cassie = CassieUdp() # local testing
 
@@ -149,54 +146,39 @@ def run_udp(policy_files):
       time.sleep(0.001)
       y = cassie.recv_newest_pd()
 
-  received_data = True
-  t = time.monotonic()
-  t0 = t
-
   policy_idx = None
 
   print('Connected!\n')
 
-  action = 0
   # Whether or not STO has been TOGGLED (i.e. it does not count the initial STO condition)
   # STO = True means that STO is ON (i.e. robot is not running) and STO = False means that STO is
   # OFF (i.e. robot *is* running)
   ESTOP = False
-  ESTOP_count = 0
-
-  orient_add = 0
 
   # We have multiple modes of operation
   # 0: Normal operation, walking with policy
-  # 1: Start up, Standing Pose with variable height (no balance)
-  # 2: Stop Drop and hopefully not roll, Damping Mode with no P gain
+  # 1: Zero out memory of policy (if applicable)
+  # 2: Stop, drop, and hopefully not roll, damping mode with no P gain
   operation_mode = 0
-  standing_height = 0.7
-  MAX_HEIGHT = 0.8
-  MIN_HEIGHT = 0.4
-  D_mult = 1  # Reaaaaaally bad stability problems if this is pushed higher as a multiplier
-                   # Might be worth tuning by joint but something else if probably needed
-  phase = 0
-  counter = 0
-  phase_add = env.simrate
-  actual_speed = 0
 
-  speed = 0
-  side_speed = 0
+  # Command inputs
+  speed          = 0
+  side_speed     = 0
+  orient_add     = 0
+  phase_add      = env.simrate
+  phase          = 0
 
-  max_speed = 2.0
-  min_speed = -0.3
-  max_y_speed = 0.25
-  min_y_speed = -0.25
-
-  joint_bias = 0.0
-  joint_bias = 0.0
-
-  pitch_bias = 0
-  roll_bias = 0
-
-  delay = 30
-  logged = True
+  D_mult         = 1
+  actual_speed   = 0
+  delay          = 30
+  counter        = 0
+  pitch_bias     = 0
+  ESTOP_count    = 0
+  max_speed      =  2.00
+  min_speed      = -0.30
+  max_y_speed    =  0.25
+  min_y_speed    = -0.25
+  logged         = True
 
   for policy in policies:
     if hasattr(policy, 'init_hidden_state'):
@@ -204,11 +186,13 @@ def run_udp(policy_files):
   for policy in m_policies:
     if hasattr(policy, 'init_hidden_state'):
       policy.init_hidden_state()
-  old_settings = termios.tcgetattr(sys.stdin)
 
+  old_settings = termios.tcgetattr(sys.stdin)
   try:
     tty.setcbreak(sys.stdin.fileno())
 
+    t  = time.monotonic()
+    t0 = t
     with torch.no_grad():
       while True:
         t = time.monotonic()
@@ -222,10 +206,18 @@ def run_udp(policy_files):
             print('Missed a cycle!                ')
             continue	
 
-        """ 
-         Control of the robot using a wireless handheld controller.
-        """
         if platform.node() == 'cassie':
+          """ 
+           Control of the physical robot using a wireless handheld controller.
+          """
+
+          # Switch the operation mode based on the toggle next to STO
+          if state.radio.channel[9] < -0.5: # towards operator means damping shutdown mode
+              operation_mode = 2
+          elif state.radio.channel[9] > 0.5: # away from the operator means zero hidden states
+            operation_mode = 1
+          else:                              # Middle means normal walking
+            operation_mode = 0
 
           # Radio control
           orient_add -= state.radio.channel[3] / 60.0
@@ -237,18 +229,6 @@ def run_udp(policy_files):
           else:
               ESTOP = False
               logged = False
-
-          #if state.radio.channel[15] < 0 and hasattr(policy, 'init_hidden_state'):
-              #print("(TOGGLE SWITCH) RESETTING HIDDEN STATES TO ZERO!")
-          #    policy.init_hidden_state()
-
-          # Switch the operation mode based on the toggle next to STO
-          if state.radio.channel[9] < -0.5: # towards operator means damping shutdown mode
-              operation_mode = 2
-          elif state.radio.channel[9] > 0.5: # away from the operator means zero hidden states
-            operation_mode = 1
-          else:                              # Middle means normal walking
-            operation_mode = 0
 
           raw_spd = (state.radio.channel[6] + 1)/2 + state.radio.channel[0]/5
           speed = raw_spd * max_speed if raw_spd > 0 else -raw_spd * min_speed
@@ -263,10 +243,10 @@ def run_udp(policy_files):
           if policy_idx == -1:
               policy_idx = None
 
+        else:
           """ 
            Control of the robot in simulation using a keyboard.
           """
-        else:
           tt = time.monotonic() - t0
 
           if check_stdin():
@@ -303,12 +283,8 @@ def run_udp(policy_files):
               ESTOP = not ESTOP
               logged = False
 
-          #speed = max(min_speed, speed)
-          #speed = min(max_speed, speed)
-
           side_speed = max(min_y_speed, side_speed)
           side_speed = min(max_y_speed, side_speed)
-          #print("Phase add: {}, {}".format(phase_add, 0.8 * speed))
 
         if ESTOP:
             # Save log files after STO toggle (skipping first STO)
@@ -323,7 +299,10 @@ def run_udp(policy_files):
                         "target": target_log}
 
                 
-                fname = 'log_' + datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H:%M') + '_' + str(datetime.timedelta(seconds=round(tt))) + '.pkl'
+                fname = 'log_' + \
+                        datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H:%M') + \
+                        '_' + str(datetime.timedelta(seconds=round(tt))) + \
+                        '.pkl'
                 print()
                 print(fname)
                 print()
@@ -335,11 +314,11 @@ def run_udp(policy_files):
                 ESTOP_count += 1
 
                 # Clear out logs
-                time_log   = [] # time stamp
-                input_log  = [] # network inputs
-                output_log = [] # network outputs
-                state_log  = [] # cassie state
-                target_log = [] #PD target log
+                time_log   = []
+                input_log  = []
+                output_log = []
+                state_log  = []
+                target_log = []
                 t0 = time.monotonic()
 
             for policy in policies:
@@ -376,9 +355,6 @@ def run_udp(policy_files):
         else:
           ext_state   = np.concatenate(([speed], [side_speed]))
 
-        #pelvis_xyz   = quaternion2euler(state.pelvis.orientation)
-        #pelvis_iquat = inverse_quaternion(euler2quat(z=pelvis_xyz[2], y=0, x=0))
-
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
         pelvis_hgt   = state.pelvis.position[2] - state.terrain.height
@@ -400,9 +376,8 @@ def run_udp(policy_files):
         elif operation_mode == 0:
           mode = 'WALK'
 
-        actual_speed = 0.9 * actual_speed + 0.1 * pelvis_vel[0]
-        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, ''), end='\r')
-        RL_state = np.concatenate([robot_state, ext_state])
+        actual_speed    = 0.9 * actual_speed + 0.1 * pelvis_vel[0]
+        RL_state        = np.concatenate([robot_state, ext_state])
         mirror_RL_state = env.mirror_state(RL_state)
 
         # Construct input vector
@@ -421,12 +396,20 @@ def run_udp(policy_files):
           env_action = [(a + m) / 2 for a, m in zip(actions, mirror_actions)]
         else:
           env_action = actions
-        targets = [action + offset for action in env_action]
+
+        targets = [action[:10] + offset for action in env_action]
+
+        p_gains = [action[10:20] if len(action) > 10 else np.zeros(10) for action in env_action]
+        d_gains = [action[20:30] if len(action) > 20 else np.zeros(10) for action in env_action]
 
         if policy_idx is None:
           target = np.mean(targets, axis=0)
+          p_gain = np.mean(p_gains, axis=0)
         else:
           target = targets[policy_idx]
+          p_gain = p_gains[policy_idx]
+
+        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, np.max(p_gain), ''), end='\r')
 
         if ESTOP or operation_mode == 2:
           for i in range(5):
@@ -439,9 +422,9 @@ def run_udp(policy_files):
         else:
           # Send action
           for i in range(5):
-            u.leftLeg.motorPd.pGain[i] = env.P[i]
+            u.leftLeg.motorPd.pGain[i] = env.P[i] + p_gain[i]
             u.leftLeg.motorPd.dGain[i] = env.D[i]
-            u.rightLeg.motorPd.pGain[i] = env.P[i]
+            u.rightLeg.motorPd.pGain[i] = env.P[i] + p_gain[i+5]
             u.rightLeg.motorPd.dGain[i] = env.D[i]
             u.leftLeg.motorPd.pTarget[i] = target[i]
             u.rightLeg.motorPd.pTarget[i] = target[i+5]
@@ -472,35 +455,23 @@ def logvis(filename):
   sim = CassieSim("./cassie/cassiemujoco/cassie.xml")
   vis = CassieVis(sim, "./cassie/cassiemujoco/cassie.xml")
 
-  logs = np.load(open(filename, 'rb'), allow_pickle=True)
-  states = logs['state'] 
-  qpos = np.zeros(35) #set initial values to zero
-  inv_pelvis = inverse_quaternion(states[0].pelvis.orientation[:]) #Get inverse quaternian to ensure robot starts going straight
+  logs        = np.load(open(filename, 'rb'), allow_pickle=True)
+  states      = logs['state'] 
+  qpos        = np.zeros(35) #set initial values to zero
+  inv_pelvis  = inverse_quaternion(states[0].pelvis.orientation[:])
 
-  q_offset = quaternion_product([1,0,0,0],inv_pelvis)
-  curr_foot = np.zeros(6)
-  initial = states[0].pelvis.position[0:3]
+  q_offset    = quaternion_product([1,0,0,0],inv_pelvis)
+  curr_foot   = np.zeros(6)
+  initial     = states[0].pelvis.position[0:3]
   initial[2] -= states[0].terrain.height
 
   if initial[2] < 1:
     initial[2] -= initial[2]
   while True:
     for s in states:
-       
-        #####################QPos object ########################    
         
-        #Make sure robot is always facing forward by rotating by the initial offset
-        ones = np.array([1])
-        #qv = np.concatenate((ones, s.pelvis.position[:]), axis=0)
-        #pv = quaternion_product(q_offset, qv)  
-        #q_off_inv = inverse_quaternion(q_offset)
-        #rot_pos = quaternion_product(pv, q_off_inv)
-
-        #qpos[0:3] = rot_pos[1:4] # Pelvis X, Y, Z
-        qpos[0:3] = [x1 - x2 for x1, x2 in zip(s.pelvis.position[0:3], initial)]
-        qpos[2] = qpos[2] - s.terrain.height
-        #print(qpos[0:3], "VS", initial, "OFFSET", qpos[0:3] - initial, "height", s.terrain.height)
-
+        qpos[0:3]   = [x1 - x2 for x1, x2 in zip(s.pelvis.position[0:3], initial)]
+        qpos[2]     = qpos[2] - s.terrain.height
         qpos[3:7]   = quaternion_product(q_offset, s.pelvis.orientation[:]) # Pelvis Orientation
 
         #Left side
@@ -514,7 +485,7 @@ def logvis(filename):
         qpos[19]    = -qpos[18] - 0.0184 #Set left plantar rod w offset from foot crank
         qpos[20]    = s.motor.position[4] # check if correct (Motor [4], Joint [2])
 
-        #Righide
+        #Right side
         qpos[21:24] = s.motor.position[5:8] #double check (right hip roll, pitch, and yaw)
         theta2      = euler2quat(x=0, z=-s.joint.position[4], y=0)
         qpos[24:28] = theta2
