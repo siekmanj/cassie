@@ -136,8 +136,6 @@ class CassieEnv_v2:
     
     if self.record_forces:
       self.sim_foot_frc.append(self.sim.get_foot_force())
-    # maybe make ref traj only send relevant idxs?
-    ref_pos, ref_vel = self.get_ref_state(self.phase + self.phase_add)
     
     target = action[:10] + self.offset
     p_add  = np.zeros(10)
@@ -304,9 +302,6 @@ class CassieEnv_v2:
           mass_range = [[0, 0]] + pelvis_mass_range + side_mass + side_mass
           mass_noise = [np.random.uniform(a, b) for a, b in mass_range]
 
-          self.pitch_bias = 0.0
-          self.roll_bias = 0.0
-
           delta = 0.00001
           com_noise = [0, 0, 0] + [np.random.uniform(val - delta, val + delta) for val in self.default_ipos[3:]]
 
@@ -339,7 +334,6 @@ class CassieEnv_v2:
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
 
-
       self.sim.set_const()
 
       # Need to reset u? Or better way to reset cassie_state than taking step
@@ -354,38 +348,17 @@ class CassieEnv_v2:
       if self.clock:
         self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
       else:
-        new_freq = np.clip(self.speed, 1, 1.5)
+        new_freq = np.clip(self.speed, 1, 2.0)
         self.phase_add = int(self.simrate * new_freq)
 
       self.last_action = None
 
       return self.get_full_state()
 
-  # NOTE: this reward is slightly different from the one in Xie et al
-  # see notes for details
   def compute_reward(self, action):
-      qpos = np.copy(self.sim.qpos())
-      qvel = np.copy(self.sim.qvel())
-
-      ref_pos, ref_vel = self.get_ref_state(self.phase)
-
-      # TODO: should be variable; where do these come from?
-      # TODO: see magnitude of state variables to gauge contribution to reward
-      #weight = [0.15, 0.15, 0.1, 0.05, 0.05, 0.15, 0.15, 0.1, 0.05, 0.05]
-      weight = [0.01, 0.15, 0.1, 0.05, 0.01, 0.01, 0.15, 0.1, 0.05, 0.01]
-
-      joint_error       = 0
-      orientation_error = 0
-      spring_error      = 0
-
-      # each joint pos
-      for i, j in enumerate(self.pos_idx):
-          target = ref_pos[j]
-          actual = qpos[j]
-
-          joint_error += 25 * weight[i] * (target - actual) ** 2
 
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
+
       x_vel = np.abs(pelvis_vel[0] - self.speed)
       if x_vel < 0.04:
          x_vel = 0
@@ -404,48 +377,56 @@ class CassieEnv_v2:
       left_actual_target_euler  = quaternion2euler(left_actual)  * [0, 1, 0] # ROLL PITCH YAW
       right_actual_target_euler = quaternion2euler(right_actual) * [0, 1, 0]
 
-      left_actual_target = euler2quat(z=left_actual_target_euler[2], y=left_actual_target_euler[1], x=left_actual_target_euler[0])
+      left_actual_target  = euler2quat(z=left_actual_target_euler[2], y=left_actual_target_euler[1], x=left_actual_target_euler[0])
       right_actual_target = euler2quat(z=right_actual_target_euler[2], y=right_actual_target_euler[1], x=right_actual_target_euler[0])
 
       foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
-      foot_forces = self.sim.get_foot_force()
-      left_foot  = np.abs(foot_forces[0:3])
-      right_foot = np.abs(foot_forces[6:9])
+      foot_frc = self.sim.get_foot_force()
+      left_frc  = np.abs(foot_frc[0:3]).sum() / 400
+      right_frc = np.abs(foot_frc[6:9]).sum() / 400
 
-      left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity)
-      right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity)
+      left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
+      right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
 
       pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
 
-      left_sum, right_sum = 0,0
-      for i in range(3):
-        left_sum += left_foot[i] * left_vel[i]
-        right_sum += right_foot[i] * right_vel[i]
+      right_clock = np.sin(2 * np.pi *  self.phase / len(self.trajectory))
+      left_clock  = np.cos(2 * np.pi *  self.phase / len(self.trajectory))
 
-      foot_frc = (left_foot.sum() * left_vel.sum() + right_foot.sum() * right_vel.sum()) / 50
+      left_frc_clock  = np.clip(np.cos(2 * np.pi *  self.phase / len(self.trajectory)), 0, 1)
+      right_frc_clock = np.clip(np.sin(2 * np.pi *  self.phase / len(self.trajectory)), 0, 1)
 
-      old_foot_frc = (np.abs(left_sum) + np.abs(right_sum)) / 500
+      left_vel_clock  = 1 - left_frc_clock
+      right_vel_clock = 1 - right_frc_clock
+
+      left_frc_penalty = np.abs(left_frc_clock * left_frc)
+      left_vel_penalty = np.abs(left_vel_clock * left_vel)
+
+      right_frc_penalty = np.abs(right_frc_clock * right_frc)
+      right_vel_penalty = np.abs(right_vel_clock * right_vel)
+
+      left_penalty  = left_frc_penalty + left_vel_penalty
+      right_penalty = right_frc_penalty + right_vel_penalty
+
+      foot_frc_err = left_penalty + right_penalty
+      print('{:5.3f}'.format(np.exp(-foot_frc_err)))
+
+      #left_vel_err  = left_vel_clock  * left_vel
+      #right_frc_err = right_vel_clock * right_vel
+      #left_frc_err  = left_frc_clock  * left_frc
+      #right_frc_err = right_frc_clock * right_frc
 
       if self.last_action is None:
         ctrl_penalty = 0
       else:
         ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
 
-      # left and right shin springs
-      for i in [15, 29]:
-          target = ref_pos[i]
-          actual = qpos[i]
-
-          spring_error += 1000 * (target - actual) ** 2      
-      
-      reward = 0.100 * np.exp(-joint_error) +                    \
-               0.200 * np.exp(-x_vel) +                          \
-               0.200 * np.exp(-y_vel) +                          \
-               0.300 * np.exp(-(orientation_error + foot_err)) + \
-               0.050 * np.exp(-spring_error) +                   \
-               0.050 * np.exp(-foot_frc) +                       \
-               0.050 * np.exp(-ctrl_penalty) +                   \
+      reward = 0.300 * np.exp(-(orientation_error + foot_err)) +\
+               0.200 * np.exp(-x_vel) +                         \
+               0.200 * np.exp(-y_vel) +                         \
+               0.200 * np.exp(-foot_frc_err) +                  \
+               0.050 * np.exp(-ctrl_penalty) +                  \
                0.050 * np.exp(-pelvis_acc)
 
       return reward
@@ -472,6 +453,10 @@ class CassieEnv_v2:
 
   def get_quat(self):
     return np.hstack([quaternion2euler(self.sim.get_geom_quat())[:2]])
+
+  def get_clock(self):
+        return  [np.sin(2 * np.pi *  self.phase / len(self.trajectory)),
+                 np.cos(2 * np.pi *  self.phase / len(self.trajectory))]
 
   def get_ref_state(self, phase):
       if phase >= len(self.trajectory):
@@ -500,8 +485,7 @@ class CassieEnv_v2:
       ref_pos, ref_vel = self.get_ref_state(self.phase + self.phase_add)
 
       if self.clock:
-        clock = [np.sin(2 * np.pi *  self.phase / len(self.trajectory)),
-                 np.cos(2 * np.pi *  self.phase / len(self.trajectory))]
+        clock = self.get_clock()
         
         ext_state = np.concatenate((clock, [self.speed, self.side_speed]))
 
