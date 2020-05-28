@@ -30,12 +30,9 @@ class CassieEnv_v2:
 
     self.record_forces = False
 
-<<<<<<< HEAD
-=======
     state_est_size = 38
     mjstate_size   = 40
     clock_size     = 2
->>>>>>> 97f71e0e6431f53ab391eb75f5b6baaea4a1fef4
     speed_size     = 2
 
     if clock: # Use clock inputs
@@ -121,12 +118,6 @@ class CassieEnv_v2:
     self.side_speed = 0
     self.orient_add = 0
 
-<<<<<<< HEAD
-    self.speed = 0
-    self.y_speed = 0
-
-=======
->>>>>>> 97f71e0e6431f53ab391eb75f5b6baaea4a1fef4
     # maybe make ref traj only send relevant idxs?
     ref_pos, ref_vel = self.get_ref_state(self.phase)
 
@@ -394,15 +385,6 @@ class CassieEnv_v2:
 
           joint_error += 25 * weight[i] * (target - actual) ** 2
 
-<<<<<<< HEAD
-      forward_diff = np.abs(qvel[0] - self.speed)
-      #if forward_diff < 0.05:
-      #   forward_diff = 0
-
-      y_vel = np.abs(qvel[1] - self.side_speed)
-      #if y_vel < 0.03:
-      #  y_vel = 0
-=======
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
       x_vel = np.abs(pelvis_vel[0] - self.speed)
       if x_vel < 0.04:
@@ -411,7 +393,6 @@ class CassieEnv_v2:
       y_vel = np.abs(pelvis_vel[1] - self.side_speed)
       if y_vel < 0.04:
         y_vel = 0
->>>>>>> 97f71e0e6431f53ab391eb75f5b6baaea4a1fef4
 
       actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
       target_q = [1, 0, 0, 0]
@@ -529,27 +510,15 @@ class CassieEnv_v2:
 
       pelvis_quat = self.rotate_to_orient(self.cassie_state.pelvis.orientation)
 
-<<<<<<< HEAD
-      if self.clock:
-        clock = [np.sin(2 * np.pi *  self.phase / self.phaselen),
-                 np.cos(2 * np.pi *  self.phase / self.phaselen)]
-        
-        ext_state = np.concatenate((clock, [self.speed, self.y_speed]))
-=======
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
       pelvis_rvel = self.cassie_state.pelvis.rotationalVelocity[:]
->>>>>>> 97f71e0e6431f53ab391eb75f5b6baaea4a1fef4
 
       if self.dynamics_randomization:
         motor_pos = self.cassie_state.motor.position[:] + self.motor_encoder_noise
         joint_pos = self.cassie_state.joint.position[:] + self.joint_encoder_noise
       else:
-<<<<<<< HEAD
-        ext_state = np.concatenate([ref_pos[self.pos_idx], ref_vel[self.vel_idx],  [self.speed, self.y_speed]])
-=======
         motor_pos = self.cassie_state.motor.position[:]
         joint_pos = self.cassie_state.joint.position[:]
->>>>>>> 97f71e0e6431f53ab391eb75f5b6baaea4a1fef4
 
       motor_vel = self.cassie_state.motor.velocity[:]
       joint_vel = self.cassie_state.joint.velocity[:]
