@@ -88,13 +88,6 @@ class CassieSim:
             xfrc_array[i] = xfrc[i]
         cassie_sim_apply_force(self.c, xfrc_array, body)
 
-    def foot_force(self, force):
-        frc_array = (ctypes.c_double * 12)()
-        cassie_sim_foot_forces(self.c, frc_array)
-        for i in range(12):
-            force[i] = frc_array[i]
-        #print(force)
-
     def foot_pos(self, pos):
         pos_array = (ctypes.c_double * 6)()
         cassie_sim_foot_positions(self.c, pos_array)
@@ -104,11 +97,21 @@ class CassieSim:
     def clear_forces(self):
         cassie_sim_clear_forces(self.c)
 
+    """
     def get_foot_forces(self):
         y = state_out_t()
         force = np.zeros(12)
         self.foot_force(force)
         return force[[2, 8]]
+  """
+
+    def get_foot_force(self):
+        force = np.zeros(12)
+        frc_array = (ctypes.c_double * 12)()
+        cassie_sim_foot_forces(self.c, frc_array)
+        for i in range(12):
+            force[i] = frc_array[i]
+        return force
 
     def get_dof_damping(self):
         ptr = cassie_sim_dof_damping(self.c)
@@ -132,15 +135,22 @@ class CassieSim:
           ret[i] = ptr[i]
         return ret
 
-    def get_ground_friction(self):
-        ptr = cassie_sim_ground_friction(self.c)
-        ret = np.zeros(3)
-        for i in range(3):
+    def get_geom_friction(self):
+        ptr = cassie_sim_geom_friction(self.c)
+        ret = np.zeros(self.ngeom * 3)
+        for i in range(self.ngeom * 3):
           ret[i] = ptr[i]
         return ret
 
     def get_geom_rgba(self):
         ptr = cassie_sim_geom_rgba(self.c)
+        ret = np.zeros(self.ngeom * 4)
+        for i in range(self.ngeom * 4):
+          ret[i] = ptr[i]
+        return ret
+
+    def get_geom_quat(self):
+        ptr = cassie_sim_geom_quat(self.c)
         ret = np.zeros(self.ngeom * 4)
         for i in range(self.ngeom * 4):
           ret[i] = ptr[i]
@@ -183,17 +193,17 @@ class CassieSim:
 
         cassie_sim_set_body_ipos(self.c, c_arr)
 
-    def set_ground_friction(self, data):
-        c_arr = (ctypes.c_double * 3)()
+    def set_geom_friction(self, data):
+        c_arr = (ctypes.c_double * (self.ngeom*3))()
 
-        if len(data) != 3:
-           print("SIZE MISMATCH SET_GROUND_FRICTION()")
+        if len(data) != self.ngeom * 3:
+           print("SIZE MISMATCH SET_GEOM_FRICTION()")
            exit(1)
 
-        for i in range(3):
+        for i in range(self.ngeom*3):
           c_arr[i] = data[i]
 
-        cassie_sim_set_ground_friction(self.c, c_arr)
+        cassie_sim_set_geom_friction(self.c, c_arr)
 
     def set_geom_rgba(self, data):
         ngeom = self.ngeom * 4
@@ -209,6 +219,22 @@ class CassieSim:
 
         cassie_sim_set_geom_rgba(self.c, c_arr)
     
+    def set_geom_quat(self, data):
+        ngeom = self.ngeom * 4
+
+        if len(data) != ngeom:
+           print("SIZE MISMATCH SET_GEOM_QUAT()")
+           exit(1)
+
+        c_arr = (ctypes.c_double * ngeom)()
+        #print("SETTING:")
+        #print(c_arr, data)
+
+        for i in range(ngeom):
+          c_arr[i] = data[i]
+
+        cassie_sim_set_geom_quat(self.c, c_arr)
+
     def set_const(self):
         cassie_sim_set_const(self.c)
 
