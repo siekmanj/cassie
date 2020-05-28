@@ -91,7 +91,7 @@ class CassieEnv_v2:
 
     self.max_orient_change = 0.2
 
-    self.max_speed = 2.2
+    self.max_speed = 2.5
     self.min_speed = -0.1
 
     self.max_side_speed = 0.25
@@ -103,10 +103,10 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
-    self.encoder_noise = 0.01
+    self.encoder_noise = 0.015
 
-    self.damping_low = 0.3
-    self.damping_high = 5.0
+    self.damping_low = 0.2
+    self.damping_high = 6.0
 
     self.mass_low = 0.3
     self.mass_high = 1.7
