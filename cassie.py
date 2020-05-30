@@ -89,7 +89,7 @@ class CassieEnv_v2:
     self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
     self.offset = self.default_offset
 
-    self.max_orient_change = 0.2
+    self.max_orient_change = 0.15
 
     self.max_speed = 2.2
     self.min_speed = -0.1
@@ -103,7 +103,7 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
-    self.encoder_noise = 0.01
+    self.encoder_noise = 0.008
 
     self.damping_low = 0.3
     self.damping_high = 5.0
@@ -111,7 +111,7 @@ class CassieEnv_v2:
     self.mass_low = 0.3
     self.mass_high = 1.7
 
-    self.fric_low = 0.20
+    self.fric_low = 0.25
     self.fric_high = 1.1
 
     self.speed      = 0
@@ -383,8 +383,8 @@ class CassieEnv_v2:
       foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
       foot_frc = self.sim.get_foot_force()
-      left_frc  = np.abs(foot_frc[0:3]).sum() / 400
-      right_frc = np.abs(foot_frc[6:9]).sum() / 400
+      left_frc  = np.abs(foot_frc[0:3]).sum() / 300
+      right_frc = np.abs(foot_frc[6:9]).sum() / 300
 
       left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
       right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
