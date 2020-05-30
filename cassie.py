@@ -410,7 +410,6 @@ class CassieEnv_v2:
       right_penalty = right_frc_penalty + right_vel_penalty
 
       foot_frc_err = left_penalty + right_penalty
-      print('{:5.3f}'.format(np.exp(-foot_frc_err)))
 
       #left_vel_err  = left_vel_clock  * left_vel
       #right_frc_err = right_vel_clock * right_vel
