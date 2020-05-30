@@ -89,7 +89,7 @@ class CassieEnv_v2:
     self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
     self.offset = self.default_offset
 
-    self.max_orient_change = 0.2
+    self.max_orient_change = 0.15
 
     self.max_speed = 2.5
     self.min_speed = -0.1
@@ -103,15 +103,15 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
-    self.encoder_noise = 0.015
+    self.encoder_noise = 0.008
 
     self.damping_low = 0.2
-    self.damping_high = 6.0
+    self.damping_high = 5.5
 
     self.mass_low = 0.3
     self.mass_high = 1.7
 
-    self.fric_low = 0.20
+    self.fric_low = 0.23
     self.fric_high = 1.1
 
     self.speed      = 0
