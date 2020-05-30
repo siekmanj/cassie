@@ -272,8 +272,8 @@ def run_udp(policy_files):
               phase_add += 1
             if c == 'g':
               phase_add -= 1
-            if c == '0' or c == '1' or c == '2':
-              if c == '2':
+            if c.isdigit():
+              if int(c) > len(policies) - 1:
                 policy_idx = None
               else:
                 policy_idx = int(c)
@@ -331,7 +331,7 @@ def run_udp(policy_files):
             if hasattr(policy, 'init_hidden_state'):
               policy.init_hidden_state()
 
-        # Quat before bias modification
+        # Rotate pelvis orientation to turn robot
         quaternion = euler2quat(z=orient_add, y=0, x=0)
         iquaternion = inverse_quaternion(quaternion)
         new_orient = quaternion_product(iquaternion, state.pelvis.orientation[:])
@@ -361,11 +361,11 @@ def run_udp(policy_files):
 
         robot_state = np.concatenate([
                 new_orient,             # pelvis orientation
-                motor_pos,
+                motor_pos,              # actuated joint positions
                 pelvis_vel,             # pelvis translational velocity
-                pelvis_rvel,
+                pelvis_rvel,            # pelvis rotational velocity
                 motor_vel,              # actuated joint velocities
-                joint_pos,
+                joint_pos,              # unactuated joint positions
                 joint_vel               # unactuated joint velocities
         ])
           
@@ -405,9 +405,11 @@ def run_udp(policy_files):
         if policy_idx is None:
           target = np.mean(targets, axis=0)
           p_gain = np.mean(p_gains, axis=0)
+          d_gain = np.mean(d_gains, axis=0)
         else:
           target = targets[policy_idx]
           p_gain = p_gains[policy_idx]
+          d_gain = d_gains[policy_idx]
 
         print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, np.max(p_gain), ''), end='\r')
 
@@ -422,11 +424,11 @@ def run_udp(policy_files):
         else:
           # Send action
           for i in range(5):
-            u.leftLeg.motorPd.pGain[i] = env.P[i] + p_gain[i]
-            u.leftLeg.motorPd.dGain[i] = env.D[i]
-            u.rightLeg.motorPd.pGain[i] = env.P[i] + p_gain[i+5]
-            u.rightLeg.motorPd.dGain[i] = env.D[i]
-            u.leftLeg.motorPd.pTarget[i] = target[i]
+            u.leftLeg.motorPd.pGain[i]    = env.P[i] + p_gain[i]
+            u.leftLeg.motorPd.dGain[i]    = env.D[i] + d_gain[i]
+            u.rightLeg.motorPd.pGain[i]   = env.P[i] + p_gain[i+5]
+            u.rightLeg.motorPd.dGain[i]   = env.D[i] + d_gain[i+5]
+            u.leftLeg.motorPd.pTarget[i]  = target[i]
             u.rightLeg.motorPd.pTarget[i] = target[i+5]
 
           time_log.append(time.time())
