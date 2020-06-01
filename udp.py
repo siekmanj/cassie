@@ -162,7 +162,7 @@ def run_udp(policy_files):
   speed        = 0
   side_speed   = 0
   orient_add   = 0
-  phase_add    = env.simrate
+  phase_add    = 75
   phase        = 0
 
   D_mult       = 1
