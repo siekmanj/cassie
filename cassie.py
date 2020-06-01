@@ -585,6 +585,7 @@ class CassieEnv_v2:
 
     elif statedim == 42: # state estimator with clock and speed
       mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(4)]
+      sidespeed  = mirror_obs[-1]
       sinclock   = mirror_obs[-3]
       cosclock   = mirror_obs[-4]
 
@@ -597,7 +598,9 @@ class CassieEnv_v2:
 
       mirrored_state = np.copy(state)
       for idx, i in enumerate(mirror_obs):
-        if i == sinclock or i == cosclock:
+        if i == sidespeed:
+          mirrored_state[:,idx] = -1 * state[:,idx]
+        elif i == sinclock or i == cosclock:
           mirrored_state[:,idx] = (np.sin(np.arcsin(state[:,i]) + np.pi))
         else:
           mirrored_state[:,idx] = (np.sign(i) * state[:,abs(int(i))])
