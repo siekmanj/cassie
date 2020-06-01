@@ -21,9 +21,6 @@ import numpy as np
 import math
 import numpy as np
 
-mirror = False
-#mirror = True
-
 def inverse_quaternion(quaternion):
 	result = np.copy(quaternion)
 	result[1:4] = -result[1:4]
@@ -128,8 +125,8 @@ def run_udp(policy_files):
 
   u = pd_in_t()
   for i in range(5):
-      u.leftLeg.motorPd.pGain[i] = env.P[i]
-      u.leftLeg.motorPd.dGain[i] = env.D[i]
+      u.leftLeg.motorPd.pGain[i]  = env.P[i]
+      u.leftLeg.motorPd.dGain[i]  = env.D[i]
       u.rightLeg.motorPd.pGain[i] = env.P[i]
       u.rightLeg.motorPd.dGain[i] = env.D[i]
 
@@ -162,23 +159,24 @@ def run_udp(policy_files):
   operation_mode = 0
 
   # Command inputs
-  speed          = 0
-  side_speed     = 0
-  orient_add     = 0
-  phase_add      = env.simrate
-  phase          = 0
+  speed        = 0
+  side_speed   = 0
+  orient_add   = 0
+  phase_add    = 75
+  phase        = 0
 
-  D_mult         = 1
-  actual_speed   = 0
-  delay          = 30
-  counter        = 0
-  pitch_bias     = 0
-  ESTOP_count    = 0
-  max_speed      =  2.00
-  min_speed      = -0.30
-  max_y_speed    =  0.25
-  min_y_speed    = -0.25
-  logged         = True
+  D_mult       = 1
+  actual_speed = 0
+  delay        = 30
+  counter      = 0
+  pitch_bias   = 0
+  ESTOP_count  = 0
+  max_speed    =  2.00
+  min_speed    = -0.30
+  max_y_speed  =  0.25
+  min_y_speed  = -0.25
+  logged       = True
+  mirror       = False
 
   for policy in policies:
     if hasattr(policy, 'init_hidden_state'):
@@ -203,10 +201,6 @@ def run_udp(policy_files):
         state = None
         while state is None:
           state = cassie.recv_newest_pd()
-
-        #if state is None:
-        #    print('Missed a cycle!                ')
-        #    continue	
 
         if platform.node() == 'cassie':
           """ 
@@ -274,8 +268,10 @@ def run_udp(policy_files):
               phase_add += 1
             if c == 'g':
               phase_add -= 1
-            if c == '0' or c == '1' or c == '2':
-              if c == '2':
+            if c == 'm':
+              mirror = not mirror
+            if c.isdigit():
+              if int(c) > len(policies) - 1:
                 policy_idx = None
               else:
                 policy_idx = int(c)
