@@ -200,11 +200,13 @@ def run_udp(policy_files):
         tt = time.monotonic() - t0
 
         # Get newest state
-        state = cassie.recv_newest_pd()
+        state = None
+        while state is None:
+          state = cassie.recv_newest_pd()
 
-        if state is None:
-            print('Missed a cycle!                ')
-            continue	
+        #if state is None:
+        #    print('Missed a cycle!                ')
+        #    continue	
 
         if platform.node() == 'cassie':
           """ 
