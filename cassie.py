@@ -383,8 +383,8 @@ class CassieEnv_v2:
       foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
       foot_frc = self.sim.get_foot_force()
-      left_frc  = np.abs(foot_frc[0:3]).sum() / 300
-      right_frc = np.abs(foot_frc[6:9]).sum() / 300
+      left_frc  = np.abs(foot_frc[0:3]).sum() / 400
+      right_frc = np.abs(foot_frc[6:9]).sum() / 400
 
       left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
       right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
