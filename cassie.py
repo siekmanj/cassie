@@ -47,7 +47,7 @@ class CassieEnv_v2:
     self.observation_space = np.zeros(self._obs + self._obs * self.history)
 
     if impedance:
-      self.action_space = np.zeros(30)
+      self.action_space = np.zeros(20)
     else:
       self.action_space = np.zeros(10)
 
@@ -89,9 +89,9 @@ class CassieEnv_v2:
     self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
     self.offset = self.default_offset
 
-    self.max_orient_change = 0.15
+    self.max_orient_change = 0.1
 
-    self.max_speed = 2.5
+    self.max_speed = 2.2
     self.min_speed = -0.1
 
     self.max_side_speed = 0.25
@@ -103,7 +103,7 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
-    self.encoder_noise = 0.008
+    self.encoder_noise = 0.01
 
     self.damping_low = 0.2
     self.damping_high = 5.5
@@ -208,7 +208,7 @@ class CassieEnv_v2:
       if np.random.randint(300) == 0: # random changes to speed
         self.speed = np.random.uniform(self.min_speed, self.max_speed)
         if not self.clock:
-          new_freq = np.clip(self.speed, 1, 1.5)
+          new_freq = np.clip(self.speed, self.min_step_freq, self.max_step_freq)
           self.phase_add = int(self.simrate * new_freq)
 
       if np.random.randint(300) == 0: # random changes to sidespeed
