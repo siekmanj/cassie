@@ -47,7 +47,8 @@ class CassieEnv_v2:
     self.observation_space = np.zeros(self._obs + self._obs * self.history)
 
     if impedance:
-      self.action_space = np.zeros(30)
+      #self.action_space = np.zeros(30)
+      self.action_space = np.zeros(20)
     else:
       self.action_space = np.zeros(10)
 
@@ -89,10 +90,10 @@ class CassieEnv_v2:
     self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
     self.offset = self.default_offset
 
-    self.max_orient_change = 0.15
+    self.max_orient_change = 0.1
 
     self.max_speed = 2.2
-    self.min_speed = -0.1
+    self.min_speed = -0.2
 
     self.max_side_speed = 0.25
     self.min_side_speed = -0.25
@@ -103,7 +104,7 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
-    self.encoder_noise = 0.008
+    self.encoder_noise = 0.01
 
     self.damping_low = 0.3
     self.damping_high = 5.0
@@ -422,9 +423,9 @@ class CassieEnv_v2:
         ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
 
       reward = 0.300 * np.exp(-(orientation_error + foot_err)) +\
-               0.200 * np.exp(-x_vel) +                         \
-               0.200 * np.exp(-y_vel) +                         \
-               0.200 * np.exp(-foot_frc_err) +                  \
+               0.300 * np.exp(-foot_frc_err) +                  \
+               0.150 * np.exp(-x_vel) +                         \
+               0.150 * np.exp(-y_vel) +                         \
                0.050 * np.exp(-ctrl_penalty) +                  \
                0.050 * np.exp(-pelvis_acc)
 
