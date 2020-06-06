@@ -47,8 +47,8 @@ class CassieEnv_v2:
     self.observation_space = np.zeros(self._obs + self._obs * self.history)
 
     if impedance:
-      #self.action_space = np.zeros(30)
-      self.action_space = np.zeros(20)
+      self.action_space = np.zeros(30)
+      #self.action_space = np.zeros(20)
     else:
       self.action_space = np.zeros(10)
 
