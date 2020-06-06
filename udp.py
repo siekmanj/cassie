@@ -374,6 +374,9 @@ def run_udp(policy_files):
         elif operation_mode == 0:
           mode = 'WALK'
 
+        if mirror:
+          mode += ' (M) '
+
         actual_speed    = 0.9 * actual_speed + 0.1 * pelvis_vel[0]
         RL_state        = np.concatenate([robot_state, ext_state])
         mirror_RL_state = env.mirror_state(RL_state)
@@ -403,9 +406,11 @@ def run_udp(policy_files):
         if policy_idx is None:
           target = np.mean(targets, axis=0)
           p_gain = np.mean(p_gains, axis=0)
+          d_gain = np.mean(d_gains, axis=0)
         else:
           target = targets[policy_idx]
           p_gain = p_gains[policy_idx]
+          d_gain = d_gains[policy_idx]
 
         print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, np.max(p_gain), ''), end='\r')
 
@@ -421,9 +426,9 @@ def run_udp(policy_files):
           # Send action
           for i in range(5):
             u.leftLeg.motorPd.pGain[i] = env.P[i] + p_gain[i]
-            u.leftLeg.motorPd.dGain[i] = env.D[i]
+            u.leftLeg.motorPd.dGain[i] = env.D[i] + d_gain[i]
             u.rightLeg.motorPd.pGain[i] = env.P[i] + p_gain[i+5]
-            u.rightLeg.motorPd.dGain[i] = env.D[i]
+            u.rightLeg.motorPd.dGain[i] = env.D[i] + d_gain[i+5]
             u.leftLeg.motorPd.pTarget[i] = target[i]
             u.rightLeg.motorPd.pTarget[i] = target[i+5]
 
