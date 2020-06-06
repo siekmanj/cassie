@@ -104,7 +104,7 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
-    self.encoder_noise = 0.01
+    self.encoder_noise = 0.008
 
     self.damping_low = 0.3
     self.damping_high = 5.0
@@ -384,8 +384,8 @@ class CassieEnv_v2:
       foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
       foot_frc = self.sim.get_foot_force()
-      left_frc  = np.abs(foot_frc[0:3]).sum() / 400
-      right_frc = np.abs(foot_frc[6:9]).sum() / 400
+      left_frc  = np.abs(foot_frc[0:3]).sum() / 450
+      right_frc = np.abs(foot_frc[6:9]).sum() / 450
 
       left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
       right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
@@ -395,8 +395,8 @@ class CassieEnv_v2:
       right_clock = np.sin(2 * np.pi *  self.phase / len(self.trajectory))
       left_clock  = np.cos(2 * np.pi *  self.phase / len(self.trajectory))
 
-      left_frc_clock  = np.clip(np.cos(2 * np.pi *  self.phase / len(self.trajectory)), 0, 1)
-      right_frc_clock = np.clip(np.sin(2 * np.pi *  self.phase / len(self.trajectory)), 0, 1)
+      left_frc_clock  = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory)), 0, 1)
+      right_frc_clock = np.clip(np.sin(2 * np.pi * self.phase / len(self.trajectory)), 0, 1)
 
       left_vel_clock  = 1 - left_frc_clock
       right_vel_clock = 1 - right_frc_clock
@@ -411,11 +411,6 @@ class CassieEnv_v2:
       right_penalty = right_frc_penalty + right_vel_penalty
 
       foot_frc_err = left_penalty + right_penalty
-
-      #left_vel_err  = left_vel_clock  * left_vel
-      #right_frc_err = right_vel_clock * right_vel
-      #left_frc_err  = left_frc_clock  * left_frc
-      #right_frc_err = right_frc_clock * right_frc
 
       if self.last_action is None:
         ctrl_penalty = 0
