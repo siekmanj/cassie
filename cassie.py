@@ -412,21 +412,16 @@ class CassieEnv_v2:
 
       foot_frc_err = left_penalty + right_penalty
 
-      #left_vel_err  = left_vel_clock  * left_vel
-      #right_frc_err = right_vel_clock * right_vel
-      #left_frc_err  = left_frc_clock  * left_frc
-      #right_frc_err = right_frc_clock * right_frc
-
       if self.last_action is None:
         ctrl_penalty = 0
       else:
         ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
 
-      reward = 0.300 * np.exp(-(orientation_error + foot_err)) +\
-               0.300 * np.exp(-foot_frc_err) +                  \
-               0.150 * np.exp(-x_vel) +                         \
-               0.150 * np.exp(-y_vel) +                         \
-               0.050 * np.exp(-ctrl_penalty) +                  \
+      reward = 0.300 * np.exp(-(orientation_error + foot_err)) + \
+               0.250 * np.exp(-x_vel) +                          \
+               0.200 * np.exp(-y_vel) +                          \
+               0.150 * np.exp(-foot_frc_err) +                   \
+               0.050 * np.exp(-ctrl_penalty) +                   \
                0.050 * np.exp(-pelvis_acc)
 
       return reward
