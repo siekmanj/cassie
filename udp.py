@@ -412,8 +412,6 @@ def run_udp(policy_files):
           p_gain = p_gains[policy_idx]
           d_gain = d_gains[policy_idx]
 
-        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, np.max(p_gain), ''), end='\r')
-
         if ESTOP or operation_mode == 2:
           for i in range(5):
             u.leftLeg.motorPd.pGain[i] = 0.001
@@ -442,6 +440,8 @@ def run_udp(policy_files):
         while time.monotonic() - t < 0.03:
             time.sleep(0.001)
         delay = (time.monotonic() - t) * 1000
+
+        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, np.max(p_gain), ''), end='\r')
 
         # Track phase
         phase += phase_add
