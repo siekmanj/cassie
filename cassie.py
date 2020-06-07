@@ -90,9 +90,9 @@ class CassieEnv_v2:
     self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
     self.offset = self.default_offset
 
-    self.max_orient_change = 0.1
+    self.max_orient_change = 0.25
 
-    self.max_speed = 2.2
+    self.max_speed = 1.6
     self.min_speed = -0.2
 
     self.max_side_speed = 0.25
