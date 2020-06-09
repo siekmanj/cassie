@@ -18,6 +18,7 @@ import os
 import random
 
 import pickle
+import time
 
 class CassieEnv_v2:
   def __init__(self, traj='walking', simrate=60, clock=True, dynamics_randomization=False, history=0, impedance=False, **kwargs):
@@ -27,8 +28,6 @@ class CassieEnv_v2:
     self.clock                  = clock
     self.dynamics_randomization = dynamics_randomization
     self.state_est              = True
-
-    self.record_forces = False
 
     state_est_size = 38
     mjstate_size   = 40
@@ -135,8 +134,7 @@ class CassieEnv_v2:
 
   def step_simulation(self, action):
     
-    if self.record_forces:
-      self.sim_foot_frc.append(self.sim.get_foot_force())
+    self.sim_foot_frc.append(self.sim.get_foot_force())
     
     target = action[:10] + self.offset
     p_add  = np.zeros(10)
@@ -180,9 +178,7 @@ class CassieEnv_v2:
       else:
         simrate = self.simrate
 
-      if self.record_forces:
-        self.sim_foot_frc = []
-
+      self.sim_foot_frc = []
       for _ in range(simrate):
           self.step_simulation(action)
 
@@ -245,6 +241,9 @@ class CassieEnv_v2:
       self.sim.set_qvel(qvel)
 
       self.state_history = [np.zeros(self._obs) for _ in range(self.history+1)]
+
+      self.frc_sum = 0
+      self.vel_sum = 0
 
       # Randomize dynamics:
       if self.dynamics_randomization:
@@ -361,11 +360,11 @@ class CassieEnv_v2:
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
 
       x_vel = np.abs(pelvis_vel[0] - self.speed)
-      if x_vel < 0.04:
+      if x_vel < 0.05:
          x_vel = 0
 
       y_vel = np.abs(pelvis_vel[1] - self.side_speed)
-      if y_vel < 0.04:
+      if y_vel < 0.05:
         y_vel = 0
 
       actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
@@ -383,29 +382,32 @@ class CassieEnv_v2:
 
       foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
-      foot_frc = self.sim.get_foot_force()
-      left_frc  = np.abs(foot_frc[0:3]).sum() / 450
-      right_frc = np.abs(foot_frc[6:9]).sum() / 450
+      foot_frc = np.mean(self.sim_foot_frc, axis=0)
+      left_frc  = np.abs(foot_frc[0:3]).sum() / 100
+      right_frc = np.abs(foot_frc[6:9]).sum() / 100
 
       left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
       right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
 
       pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
 
-      right_clock = np.sin(2 * np.pi *  self.phase / len(self.trajectory))
-      left_clock  = np.cos(2 * np.pi *  self.phase / len(self.trajectory))
+      #left_clock  = np.cos(2 * np.pi *  self.phase / len(self.trajectory))          # left
+      #right_clock = np.cos(2 * np.pi *  self.phase / len(self.trajectory) + np.pi)
 
-      left_frc_clock  = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory)), 0, 1)
-      right_frc_clock = np.clip(np.sin(2 * np.pi * self.phase / len(self.trajectory)), 0, 1)
+      #left_frc_clock  = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory)), 0, 1) # left force, right vel
+      #right_frc_clock = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory) + np.pi), 0, 1) # right force, left vel
 
-      left_vel_clock  = 1 - left_frc_clock
-      right_vel_clock = 1 - right_frc_clock
+      #left_vel_clock  = 1 - left_frc_clock
+      #right_vel_clock = 1 - right_frc_clock
 
-      left_frc_penalty = np.abs(left_frc_clock * left_frc)
-      left_vel_penalty = np.abs(left_vel_clock * left_vel)
+      clock1 = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory)), 0, 1)         # left force,  right vel
+      clock2 = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory) + np.pi), 0, 1) # right force, left vel
 
-      right_frc_penalty = np.abs(right_frc_clock * right_frc)
-      right_vel_penalty = np.abs(right_vel_clock * right_vel)
+      left_frc_penalty = np.abs(clock1 * left_frc)
+      left_vel_penalty = np.abs(clock2 * left_vel)
+
+      right_frc_penalty = np.abs(clock2 * right_frc)
+      right_vel_penalty = np.abs(clock1 * right_vel)
 
       left_penalty  = left_frc_penalty + left_vel_penalty
       right_penalty = right_frc_penalty + right_vel_penalty
@@ -417,8 +419,16 @@ class CassieEnv_v2:
       else:
         ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
 
-      reward = 0.500 * np.exp(-foot_frc_err) +                   \
-               0.300 * np.exp(-(orientation_error + foot_err)) + \
+      #self.frc_sum = self.frc_sum * 0.99 + left_frc_penalty * 0.01
+      #self.vel_sum = self.vel_sum * 0.99 + right_frc_penalty * 0.01
+
+      #print("{:4.3f} vs {:4.3f}".format(self.frc_sum, self.vel_sum))
+      #print("{:4.3f} + {:4.3f} = {:4.3f}".format(clock1, clock2, clock1 + clock2))
+      #time.sleep(0.2)
+      #print("0.5 * {:4.3f} + 0.3 * {:4.3f} + 0.1 * {:4.3f} + 0.1 * {:4.3f} ".format(np.exp(-foot_frc_err), np.exp(-(orientation_error + foot_err)), np.exp(-x_vel), np.exp(-y_vel)))
+      reward = 0.000 + \
+               0.400 * np.exp(-(orientation_error + foot_err)) + \
+               0.400 * np.exp(-foot_frc_err) +                   \
                0.100 * np.exp(-x_vel) +                          \
                0.100 * np.exp(-y_vel)
       #reward = 0.300 * np.exp(-(orientation_error + foot_err)) + \
