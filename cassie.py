@@ -427,10 +427,10 @@ class CassieEnv_v2:
       #time.sleep(0.2)
       #print("0.5 * {:4.3f} + 0.3 * {:4.3f} + 0.1 * {:4.3f} + 0.1 * {:4.3f} ".format(np.exp(-foot_frc_err), np.exp(-(orientation_error + foot_err)), np.exp(-x_vel), np.exp(-y_vel)))
       reward = 0.000 + \
-               0.400 * np.exp(-(orientation_error + foot_err)) + \
-               0.400 * np.exp(-foot_frc_err) +                   \
-               0.100 * np.exp(-x_vel) +                          \
-               0.100 * np.exp(-y_vel)
+               0.300 * np.exp(-(orientation_error + foot_err)) + \
+               0.300 * np.exp(-foot_frc_err) +                   \
+               0.200 * np.exp(-x_vel) +                          \
+               0.200 * np.exp(-y_vel)
       #reward = 0.300 * np.exp(-(orientation_error + foot_err)) + \
       #         0.250 * np.exp(-x_vel) +                          \
       #         0.200 * np.exp(-y_vel) +                          \
