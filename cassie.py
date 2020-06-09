@@ -21,23 +21,29 @@ import pickle
 import time
 
 class CassieEnv_v2:
-  def __init__(self, traj='walking', simrate=60, clock=True, dynamics_randomization=False, history=0, impedance=False, **kwargs):
+  def __init__(self, traj='walking', simrate=60, clock=True, dynamics_randomization=False, history=0, impedance=False, height=False, **kwargs):
     self.sim = CassieSim("./cassie/cassiemujoco/cassie.xml")
     self.vis = None
 
     self.clock                  = clock
     self.dynamics_randomization = dynamics_randomization
     self.state_est              = True
+    self.command_height         = height
 
     state_est_size = 38
-    mjstate_size   = 40
     clock_size     = 2
     speed_size     = 2
+    height_size    = 1
+
+    obs_size = state_est_size + speed_size
 
     if clock: # Use clock inputs
-      self.observation_space = np.zeros(state_est_size + clock_size + speed_size)
-    else: # Don't use clock inputs (or ref traj)
-      self.observation_space = np.zeros(state_est_size + speed_size)
+      obs_size += clock_size
+
+    if height:
+      obs_size += height_size
+
+    self.observation_space = np.zeros(obs_size)
 
     # Adds option for state history for FF nets
     self._obs = len(self.observation_space)
@@ -89,9 +95,9 @@ class CassieEnv_v2:
     self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
     self.offset = self.default_offset
 
-    self.max_orient_change = 0.25
+    self.max_orient_change = 0.2
 
-    self.max_speed = 1.6
+    self.max_speed = 2.0
     self.min_speed = -0.2
 
     self.max_side_speed = 0.25
@@ -99,6 +105,9 @@ class CassieEnv_v2:
 
     self.max_step_freq = 2.0
     self.min_step_freq = 0.9
+
+    self.max_height = 1.05
+    self.min_height = 0.7
 
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
@@ -117,6 +126,7 @@ class CassieEnv_v2:
     self.speed      = 0
     self.side_speed = 0
     self.orient_add = 0
+    self.height     = 1.0
 
     # maybe make ref traj only send relevant idxs?
     ref_pos, ref_vel = self.get_ref_state(self.phase)
@@ -135,6 +145,7 @@ class CassieEnv_v2:
   def step_simulation(self, action):
     
     self.sim_foot_frc.append(self.sim.get_foot_force())
+    self.sim_height.append(self.cassie_state.pelvis.position[2] - self.cassie_state.terrain.height)
     
     target = action[:10] + self.offset
     p_add  = np.zeros(10)
@@ -179,6 +190,7 @@ class CassieEnv_v2:
         simrate = self.simrate
 
       self.sim_foot_frc = []
+      self.sim_height   = []
       for _ in range(simrate):
           self.step_simulation(action)
 
@@ -199,6 +211,9 @@ class CassieEnv_v2:
 
       if np.random.randint(50) == 0: # random changes to orientation
         self.orient_add += np.random.uniform(-self.max_orient_change, self.max_orient_change)
+
+      if np.random.randint(300) == 0: # random changes to commanded height
+        self.height = np.random.uniform(self.min_height, self.max_height)
 
       if np.random.randint(300) == 0: # random changes to speed
         self.speed = np.random.uniform(self.min_speed, self.max_speed)
@@ -344,6 +359,7 @@ class CassieEnv_v2:
       self.orient_add = 0
       self.speed      = np.random.uniform(self.min_speed, self.max_speed)
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
+      self.height     = np.random.uniform(self.min_height, self.max_height)
 
       if self.clock:
         self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
@@ -357,6 +373,13 @@ class CassieEnv_v2:
 
   def compute_reward(self, action):
 
+      if self.command_height == True:
+        pelvis_hgt = np.abs(np.mean(self.sim_height) - self.height) * 3
+
+        if pelvis_hgt < 0.02:
+          pelvis_hgt = 0
+
+      #print("{:4.3f}, {:4.3f}, {:4.3f}".format(np.mean(self.sim_height), self.height, np.exp(-pelvis_hgt)))
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
 
       x_vel = np.abs(pelvis_vel[0] - self.speed)
@@ -366,6 +389,8 @@ class CassieEnv_v2:
       y_vel = np.abs(pelvis_vel[1] - self.side_speed)
       if y_vel < 0.05:
         y_vel = 0
+
+      #print("{:4.3f}, {:4.3f}".format(np.exp(-x_vel), np.exp(-y_vel)))
 
       actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
       target_q = [1, 0, 0, 0]
@@ -399,6 +424,7 @@ class CassieEnv_v2:
 
       #left_vel_clock  = 1 - left_frc_clock
       #right_vel_clock = 1 - right_frc_clock
+      #print(pelvis_hgt)
 
       clock1 = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory)), 0, 1)         # left force,  right vel
       clock2 = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory) + np.pi), 0, 1) # right force, left vel
@@ -426,11 +452,19 @@ class CassieEnv_v2:
       #print("{:4.3f} + {:4.3f} = {:4.3f}".format(clock1, clock2, clock1 + clock2))
       #time.sleep(0.2)
       #print("0.5 * {:4.3f} + 0.3 * {:4.3f} + 0.1 * {:4.3f} + 0.1 * {:4.3f} ".format(np.exp(-foot_frc_err), np.exp(-(orientation_error + foot_err)), np.exp(-x_vel), np.exp(-y_vel)))
-      reward = 0.000 + \
-               0.300 * np.exp(-(orientation_error + foot_err)) + \
-               0.300 * np.exp(-foot_frc_err) +                   \
-               0.200 * np.exp(-x_vel) +                          \
-               0.200 * np.exp(-y_vel)
+      if self.command_height:
+        reward = 0.000 + \
+                 0.300 * np.exp(-foot_frc_err) +                   \
+                 0.200 * np.exp(-(orientation_error + foot_err)) + \
+                 0.200 * np.exp(-x_vel) +                          \
+                 0.200 * np.exp(-y_vel) +                          \
+                 0.100 * np.exp(-pelvis_hgt)
+      else:
+        reward = 0.000 + \
+                 0.300 * np.exp(-(orientation_error + foot_err)) + \
+                 0.300 * np.exp(-foot_frc_err) +                   \
+                 0.200 * np.exp(-x_vel) +                          \
+                 0.200 * np.exp(-y_vel)
       #reward = 0.300 * np.exp(-(orientation_error + foot_err)) + \
       #         0.250 * np.exp(-x_vel) +                          \
       #         0.200 * np.exp(-y_vel) +                          \
@@ -496,10 +530,16 @@ class CassieEnv_v2:
       if self.clock:
         clock = self.get_clock()
         
-        ext_state = np.concatenate((clock, [self.speed, self.side_speed]))
+        if self.command_height:
+          ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height]))
+        else:
+          ext_state = np.concatenate((clock, [self.speed, self.side_speed]))
 
       else:
-        ext_state = np.concatenate(([self.speed], [self.side_speed]))
+        if self.command_height:
+          ext_state = np.concatenate(([self.speed], [self.side_speed], [self.height]))
+        else:
+          ext_state = np.concatenate(([self.speed], [self.side_speed]))
 
       pelvis_quat = self.rotate_to_orient(self.cassie_state.pelvis.orientation)
 
@@ -576,11 +616,18 @@ class CassieEnv_v2:
     if statedim == 40: # state estimator with no clock and speed
       raise RuntimeError
 
-    elif statedim == 42: # state estimator with clock and speed
-      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(4)]
-      sidespeed  = mirror_obs[-1]
-      sinclock   = mirror_obs[-3]
-      cosclock   = mirror_obs[-4]
+    elif statedim == 42 or statedim == 43: # state estimator with clock and speed or height
+      if self.command_height:
+        mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(5)]
+        sidespeed  = mirror_obs[-2]
+        sinclock   = mirror_obs[-4]
+        cosclock   = mirror_obs[-5]
+      
+      else:
+        mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(4)]
+        sidespeed  = mirror_obs[-1]
+        sinclock   = mirror_obs[-3]
+        cosclock   = mirror_obs[-4]
 
       new_orient       = state[:,:4]
       new_orient       = np.array(list(map(inverse_quaternion, [new_orient[i] for i in range(batchdim)])))
