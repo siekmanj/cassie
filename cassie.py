@@ -230,6 +230,7 @@ class CassieEnv_v2:
         self.phase_add = int(self.simrate * new_freq)
 
       self.last_action = action
+      self.last_torque = np.asarray(self.cassie_state.motor.torque[:])
       return state, reward, done, {}
 
   def rotate_to_orient(self, vec):
@@ -368,6 +369,7 @@ class CassieEnv_v2:
         self.phase_add = int(self.simrate * new_freq)
 
       self.last_action = None
+      self.last_torque = None
 
       return self.get_full_state()
 
@@ -440,6 +442,13 @@ class CassieEnv_v2:
 
       foot_frc_err = left_penalty + right_penalty
 
+      torque = np.asarray(self.cassie_state.motor.torque[:])
+      if self.last_torque is None:
+        torque_penalty = 0
+      else:
+        torque_penalty = sum(np.abs(self.last_torque - torque)) / len(torque) / 5
+        print("torque penalty: {:4.3f}".format(np.exp(-torque_penalty)))
+
       if self.last_action is None:
         ctrl_penalty = 0
       else:
@@ -452,13 +461,18 @@ class CassieEnv_v2:
       #print("{:4.3f} + {:4.3f} = {:4.3f}".format(clock1, clock2, clock1 + clock2))
       #time.sleep(0.2)
       #print("0.5 * {:4.3f} + 0.3 * {:4.3f} + 0.1 * {:4.3f} + 0.1 * {:4.3f} ".format(np.exp(-foot_frc_err), np.exp(-(orientation_error + foot_err)), np.exp(-x_vel), np.exp(-y_vel)))
+
+      #print("TORQUE: {:4.3f}".format(np.exp(-np.sum(np.abs(self.cassie_state.motor.torque[:])/200))))
+      
       if self.command_height:
         reward = 0.000 + \
-                 0.300 * np.exp(-foot_frc_err) +                   \
-                 0.200 * np.exp(-(orientation_error + foot_err)) + \
-                 0.200 * np.exp(-x_vel) +                          \
+                 0.250 * np.exp(-x_vel) +                          \
                  0.200 * np.exp(-y_vel) +                          \
-                 0.100 * np.exp(-pelvis_hgt)
+                 0.150 * np.exp(-pelvis_hgt) +                     \
+                 0.150 * np.exp(-foot_frc_err) +                   \
+                 0.150 * np.exp(-(orientation_error + foot_err)) + \
+                 0.050 * np.exp(-ctrl_penalty) +                   \
+                 0.050 * np.exp(-torque_penalty)
       else:
         reward = 0.000 + \
                  0.300 * np.exp(-(orientation_error + foot_err)) + \
@@ -555,7 +569,7 @@ class CassieEnv_v2:
 
       motor_vel = self.cassie_state.motor.velocity[:]
       joint_vel = self.cassie_state.joint.velocity[:]
-      
+
       # remove double-counted joint/motor positions
       joint_pos = np.concatenate([joint_pos[:2], joint_pos[3:5]])
       joint_vel = np.concatenate([joint_vel[:2], joint_vel[3:5]])

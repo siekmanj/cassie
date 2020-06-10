@@ -175,8 +175,10 @@ def run_udp(policy_files):
   min_speed    = -0.30
   max_y_speed  =  0.25
   min_y_speed  = -0.25
+  cmd_height   = 0.9
   logged       = True
   mirror       = False
+  last_torque  = None
 
   for policy in policies:
     if hasattr(policy, 'init_hidden_state'):
@@ -270,6 +272,10 @@ def run_udp(policy_files):
               phase_add -= 1
             if c == 'm':
               mirror = not mirror
+            if c == 'y':
+              cmd_height += 0.01
+            if c == 'h':
+              cmd_height -= 0.01
             if c.isdigit():
               if int(c) > len(policies) - 1:
                 policy_idx = None
@@ -349,13 +355,27 @@ def run_udp(policy_files):
           new_orient = [-1 * x for x in new_orient]
 
         if env.clock:
-          ext_state   = np.concatenate((clock, [speed, side_speed]))
+          if env.command_height:
+            ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height]))
+          else:
+            ext_state   = np.concatenate((clock, [speed, side_speed]))
         else:
-          ext_state   = np.concatenate(([speed], [side_speed]))
+          if env.command_height:
+            ext_state   = np.concatenate(([speed], [side_speed], [cmd_height]))
+          else:
+            ext_state   = np.concatenate(([speed], [side_speed]))
 
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
         pelvis_hgt   = state.pelvis.position[2] - state.terrain.height
+
+        #torque = np.asarray(state.motor.torque[:])
+        #if last_torque is None:
+        #  torque_penalty = 0
+        #else:
+        #  torque_penalty = sum(np.abs(last_torque - torque)) / len(torque) / 5
+        #  print("torque penalty: {:4.3f}".format(np.exp(-torque_penalty)))
+        #last_torque = torque
 
         robot_state = np.concatenate([
                 new_orient,             # pelvis orientation
@@ -441,7 +461,7 @@ def run_udp(policy_files):
             time.sleep(0.001)
         delay = (time.monotonic() - t) * 1000
 
-        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, np.max(p_gain), ''), end='\r')
+        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, ''), end='\r')
 
         # Track phase
         phase += phase_add
