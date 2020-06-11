@@ -1,10 +1,8 @@
 # Consolidated Cassie environment.
 try:
   from .cassiemujoco import pd_in_t, state_out_t, CassieSim, CassieVis
-  from .trajectory import CassieTrajectory
 except ImportError:
   from cassiemujoco import pd_in_t, state_out_t, CassieSim, CassieVis
-  from trajectory import CassieTrajectory
 
 try:
   from .udp import euler2quat, quaternion_product, inverse_quaternion, quaternion2euler, rotate_by_quaternion
@@ -59,16 +57,7 @@ class CassieEnv_v2:
 
     self.impedance = impedance
 
-    dirname = os.path.dirname(__file__)
-
-    if traj == "walking":
-        traj_path = os.path.join(dirname, "trajectory", "stepdata.bin")
-
-    elif traj == "stepping":
-        traj_path = os.path.join(dirname, "trajectory", "more-poses-trial.bin")
-
-    # TODO: add IK trajectory compatibility
-    self.trajectory = CassieTrajectory(traj_path)
+    self.phase_len = 1700
 
     self.P = np.array([100,  100,  88,  96,  50])
     self.D = np.array([10.0, 10.0, 8.0, 9.6, 5.0])
@@ -77,33 +66,23 @@ class CassieEnv_v2:
 
     # TODO: should probably initialize this to current state
     self.cassie_state = state_out_t()
-
-    self.simrate      = simrate # simulate X mujoco steps with same pd target
-                                # 60 brings simulation from 2000Hz to roughly 30Hz
-
-    self.time    = 0 # number of time steps in current episode
-    self.phase   = 0 # portion of the phase the robot is in
-    self.counter = 0 # number of phase cycles completed in episode
-
-    # see include/cassiemujoco.h for meaning of these indices
-    self.pos_idx = [7, 8, 9, 14, 20, 21, 22, 23, 28, 34]
-    self.vel_idx = [6, 7, 8, 12, 18, 19, 20, 21, 25, 31]
-
-    self.pos_index = np.array([1,2,3,4,5,6,7,8,9,14,15,16,20,21,22,23,28,29,30,34])
-    self.vel_index = np.array([0,1,2,3,4,5,6,7,8,12,13,14,18,19,20,21,25,26,27,31])
+    self.simrate      = simrate # simulate X mujoco steps
+    self.time         = 0 # number of time steps in current episode
+    self.phase        = 0 # portion of the phase the robot is in
+    self.counter      = 0 # number of phase cycles completed in episode
 
     self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
     self.offset = self.default_offset
 
     self.max_orient_change = 0.2
 
-    self.max_speed = 2.0
+    self.max_speed = 2.5
     self.min_speed = -0.2
 
     self.max_side_speed = 0.25
     self.min_side_speed = -0.25
 
-    self.max_step_freq = 2.0
+    self.max_step_freq = 1.8
     self.min_step_freq = 0.9
 
     self.max_height = 1.05
@@ -127,9 +106,6 @@ class CassieEnv_v2:
     self.side_speed = 0
     self.orient_add = 0
     self.height     = 1.0
-
-    # maybe make ref traj only send relevant idxs?
-    ref_pos, ref_vel = self.get_ref_state(self.phase)
 
     # Record default dynamics parameters
     self.default_damping = self.sim.get_dof_damping()
@@ -197,8 +173,8 @@ class CassieEnv_v2:
       self.time  += 1
       self.phase += self.phase_add
 
-      if self.phase >= len(self.trajectory):
-          self.phase = self.phase % len(self.trajectory) - 1
+      if self.phase >= self.phase_len:
+          self.phase = self.phase % self.phase_len - 1
           self.counter += 1
 
       reward = self.compute_reward(action)
@@ -247,14 +223,9 @@ class CassieEnv_v2:
       return new_orient
         
   def reset(self):
-      self.phase = random.randint(0, len(self.trajectory))
+      self.phase = random.randint(0, self.phase_len)
       self.time = 0
       self.counter = 0
-
-      qpos, qvel = self.get_ref_state(self.phase)
-
-      self.sim.set_qpos(qpos)
-      self.sim.set_qvel(qvel)
 
       self.state_history = [np.zeros(self._obs) for _ in range(self.history+1)]
 
@@ -352,7 +323,6 @@ class CassieEnv_v2:
 
       self.sim.set_const()
 
-      # Need to reset u? Or better way to reset cassie_state than taking step
       self.cassie_state = self.sim.step_pd(self.u)
 
       self.offset = self.default_offset
@@ -381,7 +351,6 @@ class CassieEnv_v2:
         if pelvis_hgt < 0.02:
           pelvis_hgt = 0
 
-      #print("{:4.3f}, {:4.3f}, {:4.3f}".format(np.mean(self.sim_height), self.height, np.exp(-pelvis_hgt)))
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
 
       x_vel = np.abs(pelvis_vel[0] - self.speed)
@@ -391,8 +360,6 @@ class CassieEnv_v2:
       y_vel = np.abs(pelvis_vel[1] - self.side_speed)
       if y_vel < 0.05:
         y_vel = 0
-
-      #print("{:4.3f}, {:4.3f}".format(np.exp(-x_vel), np.exp(-y_vel)))
 
       actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
       target_q = [1, 0, 0, 0]
@@ -418,18 +385,8 @@ class CassieEnv_v2:
 
       pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
 
-      #left_clock  = np.cos(2 * np.pi *  self.phase / len(self.trajectory))          # left
-      #right_clock = np.cos(2 * np.pi *  self.phase / len(self.trajectory) + np.pi)
-
-      #left_frc_clock  = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory)), 0, 1) # left force, right vel
-      #right_frc_clock = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory) + np.pi), 0, 1) # right force, left vel
-
-      #left_vel_clock  = 1 - left_frc_clock
-      #right_vel_clock = 1 - right_frc_clock
-      #print(pelvis_hgt)
-
-      clock1 = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory)), 0, 1)         # left force,  right vel
-      clock2 = np.clip(np.cos(2 * np.pi * self.phase / len(self.trajectory) + np.pi), 0, 1) # right force, left vel
+      clock1 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len), 0, 1)         # left force,  right vel
+      clock2 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi), 0, 1) # right force, left vel
 
       left_frc_penalty = np.abs(clock1 * left_frc)
       left_vel_penalty = np.abs(clock2 * left_vel)
@@ -447,23 +404,12 @@ class CassieEnv_v2:
         torque_penalty = 0
       else:
         torque_penalty = sum(np.abs(self.last_torque - torque)) / len(torque) / 5
-        #print("torque penalty: {:4.3f}".format(np.exp(-torque_penalty)))
 
       if self.last_action is None:
         ctrl_penalty = 0
       else:
         ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
-
-      #self.frc_sum = self.frc_sum * 0.99 + left_frc_penalty * 0.01
-      #self.vel_sum = self.vel_sum * 0.99 + right_frc_penalty * 0.01
-
-      #print("{:4.3f} vs {:4.3f}".format(self.frc_sum, self.vel_sum))
-      #print("{:4.3f} + {:4.3f} = {:4.3f}".format(clock1, clock2, clock1 + clock2))
-      #time.sleep(0.2)
-      #print("0.5 * {:4.3f} + 0.3 * {:4.3f} + 0.1 * {:4.3f} + 0.1 * {:4.3f} ".format(np.exp(-foot_frc_err), np.exp(-(orientation_error + foot_err)), np.exp(-x_vel), np.exp(-y_vel)))
-
-      #print("TORQUE: {:4.3f}".format(np.exp(-np.sum(np.abs(self.cassie_state.motor.torque[:])/200))))
-      
+     
       if self.command_height:
         reward = 0.000 + \
                  0.300 * np.exp(-(orientation_error + foot_err)) + \
@@ -512,34 +458,12 @@ class CassieEnv_v2:
     return np.hstack([quaternion2euler(self.sim.get_geom_quat())[:2]])
 
   def get_clock(self):
-        return  [np.sin(2 * np.pi *  self.phase / len(self.trajectory)),
-                 np.cos(2 * np.pi *  self.phase / len(self.trajectory))]
-
-  def get_ref_state(self, phase):
-      if phase >= len(self.trajectory):
-          phase = phase % len(self.trajectory) - 1
-
-      pos = np.copy(self.trajectory.qpos[phase])
-
-      ###### Setting variable speed  #########
-      pos[0] *= self.speed
-      pos[0] += (self.trajectory.qpos[-1, 0] - self.trajectory.qpos[0, 0]) * self.counter * self.speed
-      ######                          ########
-
-      # setting lateral distance target to 0?
-      # regardless of reference trajectory?
-      pos[1] = 0
-
-      vel = np.copy(self.trajectory.qvel[phase])
-      vel[0] *= self.speed
-
-      return pos, vel
+        return  [np.sin(2 * np.pi *  self.phase / self.phase_len),
+                 np.cos(2 * np.pi *  self.phase / self.phase_len)]
 
   def get_full_state(self):
       qpos = np.copy(self.sim.qpos())
       qvel = np.copy(self.sim.qvel()) 
-
-      ref_pos, ref_vel = self.get_ref_state(self.phase + self.phase_add)
 
       if self.clock:
         clock = self.get_clock()
