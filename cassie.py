@@ -447,7 +447,7 @@ class CassieEnv_v2:
         torque_penalty = 0
       else:
         torque_penalty = sum(np.abs(self.last_torque - torque)) / len(torque) / 5
-        print("torque penalty: {:4.3f}".format(np.exp(-torque_penalty)))
+        #print("torque penalty: {:4.3f}".format(np.exp(-torque_penalty)))
 
       if self.last_action is None:
         ctrl_penalty = 0
