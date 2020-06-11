@@ -466,11 +466,11 @@ class CassieEnv_v2:
       
       if self.command_height:
         reward = 0.000 + \
-                 0.250 * np.exp(-x_vel) +                          \
-                 0.200 * np.exp(-y_vel) +                          \
-                 0.150 * np.exp(-pelvis_hgt) +                     \
-                 0.150 * np.exp(-foot_frc_err) +                   \
-                 0.150 * np.exp(-(orientation_error + foot_err)) + \
+                 0.300 * np.exp(-(orientation_error + foot_err)) + \
+                 0.250 * np.exp(-foot_frc_err) +                   \
+                 0.200 * np.exp(-x_vel) +                          \
+                 0.100 * np.exp(-y_vel) +                          \
+                 0.100 * np.exp(-pelvis_hgt) +                     \
                  0.050 * np.exp(-ctrl_penalty) +                   \
                  0.050 * np.exp(-torque_penalty)
       else:
