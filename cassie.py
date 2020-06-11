@@ -19,27 +19,23 @@ import pickle
 import time
 
 class CassieEnv_v2:
-  def __init__(self, traj='walking', simrate=60, clock=True, dynamics_randomization=False, history=0, impedance=False, height=False, **kwargs):
+  def __init__(self, traj='walking', simrate=60, clock=True, dynamics_randomization=False, history=0, impedance=False, **kwargs):
     self.sim = CassieSim("./cassie/cassiemujoco/cassie.xml")
     self.vis = None
 
     self.clock                  = clock
     self.dynamics_randomization = dynamics_randomization
     self.state_est              = True
-    self.command_height         = height
 
     state_est_size = 38
-    clock_size     = 2
-    speed_size     = 2
-    height_size    = 1
+    clock_size     = 2 # [sin(t), cos(t)]
+    speed_size     = 2 # [x speed, y speed]
+    height_size    = 2 # [pelvis height, foot apex height]
 
-    obs_size = state_est_size + speed_size
+    obs_size = state_est_size + speed_size + height_size
 
     if clock: # Use clock inputs
       obs_size += clock_size
-
-    if height:
-      obs_size += height_size
 
     self.observation_space = np.zeros(obs_size)
 
@@ -87,6 +83,9 @@ class CassieEnv_v2:
     self.max_height = 1.05
     self.min_height = 0.7
 
+    self.max_foot_height = 0.15
+    self.min_foot_height = 0.05
+
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
@@ -101,10 +100,11 @@ class CassieEnv_v2:
     self.fric_low = 0.25
     self.fric_high = 1.1
 
-    self.speed      = 0
-    self.side_speed = 0
-    self.orient_add = 0
-    self.height     = 1.0
+    self.speed       = 0
+    self.side_speed  = 0
+    self.orient_add  = 0
+    self.height      = 1.0
+    self.foot_height = 0.05
 
     # Record default dynamics parameters
     self.default_damping = self.sim.get_dof_damping()
@@ -189,6 +189,9 @@ class CassieEnv_v2:
 
       if np.random.randint(300) == 0: # random changes to commanded height
         self.height = np.random.uniform(self.min_height, self.max_height)
+
+      if np.random.randint(300) == 0: # random changes to commanded foot height
+        self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
       if np.random.randint(300) == 0: # random changes to speed
         self.speed = np.random.uniform(self.min_speed, self.max_speed)
@@ -324,10 +327,11 @@ class CassieEnv_v2:
 
       self.cassie_state = self.sim.step_pd(self.u)
 
-      self.orient_add = 0
-      self.speed      = np.random.uniform(self.min_speed, self.max_speed)
-      self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
-      self.height     = np.random.uniform(self.min_height, self.max_height)
+      self.orient_add  = 0
+      self.speed       = np.random.uniform(self.min_speed, self.max_speed)
+      self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
+      self.height      = np.random.uniform(self.min_height, self.max_height)
+      self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
       if self.clock:
         self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
@@ -341,97 +345,113 @@ class CassieEnv_v2:
       return self.get_full_state()
 
   def compute_reward(self, action):
+    #####################
+    # HEIGHT COST TERMS #
+    #####################
 
-      pelvis_hgt = np.abs(np.mean(self.sim_height) - self.height) * 3
+    sim_height = np.mean(self.sim_height)
+    pelvis_hgt = np.abs(sim_height - self.height) * 3
 
-      if pelvis_hgt < 0.02:
-        pelvis_hgt = 0
+    if pelvis_hgt < 0.02:
+      pelvis_hgt = 0
 
-      pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
+    pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
 
-      x_vel = np.abs(pelvis_vel[0] - self.speed)
-      if x_vel < 0.05:
-         x_vel = 0
+    ####################
+    # SPEED COST TERMS #
+    ####################
 
-      y_vel = np.abs(pelvis_vel[1] - self.side_speed)
-      if y_vel < 0.05:
-        y_vel = 0
+    x_vel = np.abs(pelvis_vel[0] - self.speed)
+    if x_vel < 0.05:
+       x_vel = 0
 
-      actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
-      target_q = [1, 0, 0, 0]
-      orientation_error = 6 * (1 - np.inner(actual_q, target_q) ** 2)
+    y_vel = np.abs(pelvis_vel[1] - self.side_speed)
+    if y_vel < 0.05:
+      y_vel = 0
 
-      lhgt = pelvis_hgt - self.cassie_state.leftFoot.position[:][2]
-      rhgt = pelvis_hgt - self.cassie_State.rightFoot.position[:][2]
+    ##########################
+    # ORIENTATION COST TERMS #
+    ##########################
 
-      left_actual  = quaternion_product(actual_q, self.cassie_state.leftFoot.orientation)
-      right_actual = quaternion_product(actual_q, self.cassie_state.rightFoot.orientation)
+    actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
+    target_q = [1, 0, 0, 0]
+    orientation_error = 6 * (1 - np.inner(actual_q, target_q) ** 2)
 
-      left_actual_target_euler  = quaternion2euler(left_actual)  * [0, 1, 0] # ROLL PITCH YAW
-      right_actual_target_euler = quaternion2euler(right_actual) * [0, 1, 0]
+    left_actual  = quaternion_product(actual_q, self.cassie_state.leftFoot.orientation)
+    right_actual = quaternion_product(actual_q, self.cassie_state.rightFoot.orientation)
 
-      left_actual_target  = euler2quat(z=left_actual_target_euler[2], y=left_actual_target_euler[1], x=left_actual_target_euler[0])
-      right_actual_target = euler2quat(z=right_actual_target_euler[2], y=right_actual_target_euler[1], x=right_actual_target_euler[0])
+    left_actual_target_euler  = quaternion2euler(left_actual)  * [0, 1, 0] # ROLL PITCH YAW
+    right_actual_target_euler = quaternion2euler(right_actual) * [0, 1, 0]
 
-      foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
+    left_actual_target  = euler2quat(z=left_actual_target_euler[2], y=left_actual_target_euler[1], x=left_actual_target_euler[0])
+    right_actual_target = euler2quat(z=right_actual_target_euler[2], y=right_actual_target_euler[1], x=right_actual_target_euler[0])
 
-      foot_frc = np.mean(self.sim_foot_frc, axis=0)
-      left_frc  = np.abs(foot_frc[0:3]).sum() / 250
-      right_frc = np.abs(foot_frc[6:9]).sum() / 250
+    foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
-      left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
-      right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
+    foot_frc = np.mean(self.sim_foot_frc, axis=0)
+    left_frc  = np.abs(foot_frc[0:3]).sum() / 250
+    right_frc = np.abs(foot_frc[6:9]).sum() / 250
 
-      pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
+    left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
+    right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
 
-      clock1 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len), 0, 1)         # left force,  right vel
-      clock2 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi), 0, 1) # right force, left vel
+    pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
 
-      left_frc_penalty = np.abs(clock1 * left_frc)
-      left_vel_penalty = np.abs(clock2 * left_vel)
+    clock1 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len), 0, 1)         # left force,  right vel
+    clock2 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi), 0, 1) # right force, left vel
 
-      right_frc_penalty = np.abs(clock2 * right_frc)
-      right_vel_penalty = np.abs(clock1 * right_vel)
+    #####################
+    # FOOT REWARD TERMS #
+    #####################
 
-      left_penalty  = left_frc_penalty + left_vel_penalty
-      right_penalty = right_frc_penalty + right_vel_penalty
+    # Penalty which multiplies foot forces by 1 during swing, and 0 during stance.
+    # (punish foot forces in the air)
+    left_frc_penalty  = np.abs(clock1 * left_frc)
+    right_frc_penalty = np.abs(clock2 * right_frc)
 
-      foot_frc_err = left_penalty + right_penalty
+    # Penalty which multiplies foot velocities by 1 during stance, and 0 during swing.
+    # (punish foot velocities when foot is on the ground)
+    left_vel_penalty  = np.abs(clock2 * left_vel)
+    right_vel_penalty = np.abs(clock1 * right_vel)
 
-      torque = np.asarray(self.cassie_state.motor.torque[:])
-      if self.last_torque is None:
-        torque_penalty = 0
-      else:
-        torque_penalty = sum(np.abs(self.last_torque - torque)) / len(torque) / 5
+    left_penalty  = left_frc_penalty + left_vel_penalty
+    right_penalty = right_frc_penalty + right_vel_penalty
+    foot_frc_err  = left_penalty + right_penalty
 
-      if self.last_action is None:
-        ctrl_penalty = 0
-      else:
-        ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
-     
-      if self.command_height:
-        reward = 0.000 + \
-                 0.300 * np.exp(-(orientation_error + foot_err)) + \
-                 0.250 * np.exp(-foot_frc_err) +                   \
-                 0.200 * np.exp(-x_vel) +                          \
-                 0.100 * np.exp(-y_vel) +                          \
-                 0.100 * np.exp(-pelvis_hgt) +                     \
-                 0.050 * np.exp(-ctrl_penalty) +                   \
-                 0.050 * np.exp(-torque_penalty)
-      else:
-        reward = 0.000 + \
-                 0.300 * np.exp(-(orientation_error + foot_err)) + \
-                 0.300 * np.exp(-foot_frc_err) +                   \
-                 0.200 * np.exp(-x_vel) +                          \
-                 0.200 * np.exp(-y_vel)
-      #reward = 0.300 * np.exp(-(orientation_error + foot_err)) + \
-      #         0.250 * np.exp(-x_vel) +                          \
-      #         0.200 * np.exp(-y_vel) +                          \
-      #         0.150 * np.exp(-foot_frc_err) +                   \
-      #         0.050 * np.exp(-ctrl_penalty) +                   \
-      #         0.050 * np.exp(-pelvis_acc)
+    # Penalty which punishes foot heights too far from the commanded apex
+    lhgt = sim_height + self.cassie_state.leftFoot.position[:][2]
+    rhgt = sim_height + self.cassie_state.rightFoot.position[:][2]
 
-      return reward
+    foot_height_err = (clock1 * np.abs(lhgt - self.foot_height) + clock2 * np.abs(rhgt - self.foot_height))*6
+
+    ########################
+    # JERKINESS COST TERMS #
+    ########################
+
+    # Torque cost term
+    torque = np.asarray(self.cassie_state.motor.torque[:])
+    if self.last_torque is None:
+      torque_penalty = 0
+    else:
+      torque_penalty = (sum(np.abs(self.last_torque - torque)) / len(torque)) / 7
+
+    # Action cost term
+    if self.last_action is None:
+      ctrl_penalty = 0
+    else:
+      ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
+   
+    reward = 0.000 + \
+             0.250 * np.exp(-(orientation_error + foot_err)) + \
+             0.250 * np.exp(-foot_frc_err) +                   \
+             0.150 * np.exp(-x_vel) +                          \
+             0.100 * np.exp(-y_vel) +                          \
+             0.100 * np.exp(-pelvis_hgt) +                     \
+             0.100 * np.exp(-foot_height_err) +                \
+             0.025 * np.exp(-ctrl_penalty) +                   \
+             0.025 * np.exp(-torque_penalty)
+
+    return reward
 
   def get_dynamics(self):
     damping = self.sim.get_dof_damping()
@@ -467,16 +487,10 @@ class CassieEnv_v2:
       if self.clock:
         clock = self.get_clock()
         
-        if self.command_height:
-          ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height]))
-        else:
-          ext_state = np.concatenate((clock, [self.speed, self.side_speed]))
+        ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height, self.foot_height]))
 
       else:
-        if self.command_height:
-          ext_state = np.concatenate(([self.speed], [self.side_speed], [self.height]))
-        else:
-          ext_state = np.concatenate(([self.speed], [self.side_speed]))
+        ext_state = np.concatenate(([self.speed, self.side_speed, self.height, self.foot_height]))
 
       pelvis_quat = self.rotate_to_orient(self.cassie_state.pelvis.orientation)
 
@@ -553,19 +567,12 @@ class CassieEnv_v2:
     if statedim == 40: # state estimator with no clock and speed
       raise RuntimeError
 
-    elif statedim == 42 or statedim == 43: # state estimator with clock and speed or height
-      if self.command_height:
-        mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(5)]
-        sidespeed  = mirror_obs[-2]
-        sinclock   = mirror_obs[-4]
-        cosclock   = mirror_obs[-5]
+    elif statedim == 44: # state estimator with clock and speed or height
+      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(6)]
+      sidespeed  = mirror_obs[-3]
+      sinclock   = mirror_obs[-5]
+      cosclock   = mirror_obs[-6]
       
-      else:
-        mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(4)]
-        sidespeed  = mirror_obs[-1]
-        sinclock   = mirror_obs[-3]
-        cosclock   = mirror_obs[-4]
-
       new_orient       = state[:,:4]
       new_orient       = np.array(list(map(inverse_quaternion, [new_orient[i] for i in range(batchdim)])))
       new_orient[:,2] *= -1
