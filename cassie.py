@@ -71,8 +71,7 @@ class CassieEnv_v2:
     self.phase        = 0 # portion of the phase the robot is in
     self.counter      = 0 # number of phase cycles completed in episode
 
-    self.default_offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
-    self.offset = self.default_offset
+    self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
 
     self.max_orient_change = 0.2
 
@@ -241,24 +240,24 @@ class CassieEnv_v2:
                                [damp[2], damp[2]], 
                                [damp[3], damp[3]], 
                                [damp[4], damp[4]], 
-                               [damp[5], damp[5]]]                 # 0->5
+                               [damp[5], damp[5]]] # 0->5
 
           hip_damp_range = [[damp[6]*self.damping_low, damp[6]*self.damping_high],
                             [damp[7]*self.damping_low, damp[7]*self.damping_high],
-                            [damp[8]*self.damping_low, damp[8]*self.damping_high]]  # 6->8 and 19->21
+                            [damp[8]*self.damping_low, damp[8]*self.damping_high]]        # 6->8 and 19->21
 
           achilles_damp_range = [[damp[9]*self.damping_low,  damp[9]*self.damping_high],
                                  [damp[10]*self.damping_low, damp[10]*self.damping_high], 
                                  [damp[11]*self.damping_low, damp[11]*self.damping_high]] # 9->11 and 22->24
 
-          knee_damp_range     = [[damp[12]*self.damping_low, damp[12]*self.damping_high]]   # 12 and 25
-          shin_damp_range     = [[damp[13]*self.damping_low, damp[13]*self.damping_high]]   # 13 and 26
-          tarsus_damp_range   = [[damp[14]*self.damping_low, damp[14]*self.damping_high]]             # 14 and 27
+          knee_damp_range     = [[damp[12]*self.damping_low, damp[12]*self.damping_high]] # 12 and 25
+          shin_damp_range     = [[damp[13]*self.damping_low, damp[13]*self.damping_high]] # 13 and 26
+          tarsus_damp_range   = [[damp[14]*self.damping_low, damp[14]*self.damping_high]] # 14 and 27
 
-          heel_damp_range     = [[damp[15], damp[15]]]                           # 15 and 28
-          fcrank_damp_range   = [[damp[16]*self.damping_low, damp[16]*self.damping_high]]   # 16 and 29
-          prod_damp_range     = [[damp[17], damp[17]]]                           # 17 and 30
-          foot_damp_range     = [[damp[18]*self.damping_low, damp[18]*self.damping_high]]   # 18 and 31
+          heel_damp_range     = [[damp[15], damp[15]]]                                    # 15 and 28
+          fcrank_damp_range   = [[damp[16]*self.damping_low, damp[16]*self.damping_high]] # 16 and 29
+          prod_damp_range     = [[damp[17], damp[17]]]                                    # 17 and 30
+          foot_damp_range     = [[damp[18]*self.damping_low, damp[18]*self.damping_high]] # 18 and 31
 
           side_damp = hip_damp_range + achilles_damp_range + knee_damp_range + shin_damp_range + tarsus_damp_range + heel_damp_range + fcrank_damp_range + prod_damp_range + foot_damp_range
           damp_range = pelvis_damp_range + side_damp + side_damp
@@ -289,7 +288,7 @@ class CassieEnv_v2:
           mass_range = [[0, 0]] + pelvis_mass_range + side_mass + side_mass
           mass_noise = [np.random.uniform(a, b) for a, b in mass_range]
 
-          delta = 0.00001
+          delta = 0.0
           com_noise = [0, 0, 0] + [np.random.uniform(val - delta, val + delta) for val in self.default_ipos[3:]]
 
           fric_noise = []
@@ -325,8 +324,6 @@ class CassieEnv_v2:
 
       self.cassie_state = self.sim.step_pd(self.u)
 
-      self.offset = self.default_offset
-
       self.orient_add = 0
       self.speed      = np.random.uniform(self.min_speed, self.max_speed)
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
@@ -345,11 +342,10 @@ class CassieEnv_v2:
 
   def compute_reward(self, action):
 
-      if self.command_height == True:
-        pelvis_hgt = np.abs(np.mean(self.sim_height) - self.height) * 3
+      pelvis_hgt = np.abs(np.mean(self.sim_height) - self.height) * 3
 
-        if pelvis_hgt < 0.02:
-          pelvis_hgt = 0
+      if pelvis_hgt < 0.02:
+        pelvis_hgt = 0
 
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
 
@@ -364,6 +360,9 @@ class CassieEnv_v2:
       actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
       target_q = [1, 0, 0, 0]
       orientation_error = 6 * (1 - np.inner(actual_q, target_q) ** 2)
+
+      lhgt = pelvis_hgt - self.cassie_state.leftFoot.position[:][2]
+      rhgt = pelvis_hgt - self.cassie_State.rightFoot.position[:][2]
 
       left_actual  = quaternion_product(actual_q, self.cassie_state.leftFoot.orientation)
       right_actual = quaternion_product(actual_q, self.cassie_state.rightFoot.orientation)
