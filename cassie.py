@@ -362,7 +362,7 @@ class CassieEnv_v2:
       orientation_error = 6 * (1 - np.inner(actual_q, target_q) ** 2)
 
       lhgt = pelvis_hgt - self.cassie_state.leftFoot.position[:][2]
-      rhgt = pelvis_hgt - self.cassie_State.rightFoot.position[:][2]
+      rhgt = pelvis_hgt - self.cassie_state.rightFoot.position[:][2]
 
       left_actual  = quaternion_product(actual_q, self.cassie_state.leftFoot.orientation)
       right_actual = quaternion_product(actual_q, self.cassie_state.rightFoot.orientation)
