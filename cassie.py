@@ -445,7 +445,7 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
 
-    print("{:4.3f}".format(np.exp(-foot_frc_err)))
+    #print("{:4.3f}".format(np.exp(-foot_frc_err)))
    
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
