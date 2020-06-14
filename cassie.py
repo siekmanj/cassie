@@ -72,10 +72,10 @@ class CassieEnv_v2:
     self.max_orient_change = 0.2
 
     self.max_speed = 2.5
-    self.min_speed = -0.2
+    self.min_speed = -0.5
 
-    self.max_side_speed = 0.25
-    self.min_side_speed = -0.25
+    self.max_side_speed  = 0.25
+    self.min_side_speed  = -0.25
 
     self.max_step_freq = 1.8
     self.min_step_freq = 0.9
@@ -83,8 +83,8 @@ class CassieEnv_v2:
     self.max_height = 1.05
     self.min_height = 0.7
 
-    self.max_foot_height = 0.15
-    self.min_foot_height = 0.05
+    self.max_foot_height = 0.25
+    self.min_foot_height = 0.02
 
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
@@ -184,7 +184,7 @@ class CassieEnv_v2:
 
       state = self.get_full_state() 
 
-      if np.random.randint(50) == 0: # random changes to orientation
+      if np.random.randint(300) == 0: # random changes to orientation
         self.orient_add += np.random.uniform(-self.max_orient_change, self.max_orient_change)
 
       if np.random.randint(300) == 0: # random changes to commanded height
@@ -195,6 +195,7 @@ class CassieEnv_v2:
 
       if np.random.randint(300) == 0: # random changes to speed
         self.speed = np.random.uniform(self.min_speed, self.max_speed)
+
         if not self.clock:
           new_freq = np.clip(self.speed, 1, 1.5)
           self.phase_add = int(self.simrate * new_freq)
@@ -369,6 +370,8 @@ class CassieEnv_v2:
     if y_vel < 0.05:
       y_vel = 0
 
+    x_vel *= 2
+
     ##########################
     # ORIENTATION COST TERMS #
     ##########################
@@ -388,9 +391,10 @@ class CassieEnv_v2:
 
     foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
-    foot_frc = np.mean(self.sim_foot_frc, axis=0)
-    left_frc  = np.abs(foot_frc[0:3]).sum() / 250
-    right_frc = np.abs(foot_frc[6:9]).sum() / 250
+    frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
+    foot_frc       = np.mean(self.sim_foot_frc, axis=0)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
+    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 250)
 
     left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
     right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
@@ -440,6 +444,8 @@ class CassieEnv_v2:
       ctrl_penalty = 0
     else:
       ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
+
+    print("{:4.3f}".format(np.exp(-foot_frc_err)))
    
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
