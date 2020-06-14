@@ -176,6 +176,7 @@ def run_udp(policy_files):
   max_y_speed  =  0.25
   min_y_speed  = -0.25
   cmd_height   = 0.9
+  foot_cmd_height = 0.05
   logged       = True
   mirror       = False
   last_torque  = None
@@ -276,6 +277,10 @@ def run_udp(policy_files):
               cmd_height += 0.01
             if c == 'h':
               cmd_height -= 0.01
+            if c == 'c':
+              foot_cmd_height += 0.01
+            if c == 'v':
+              foot_cmd_height -= 0.01
             if c.isdigit():
               if int(c) > len(policies) - 1:
                 policy_idx = None
@@ -340,7 +345,7 @@ def run_udp(policy_files):
         iquaternion = inverse_quaternion(quaternion)
         new_orient = quaternion_product(iquaternion, state.pelvis.orientation[:])
 
-        clock = [np.sin(2 * np.pi *  phase / len(env.trajectory)), np.cos(2 * np.pi *  phase / len(env.trajectory))]
+        clock = [np.sin(2 * np.pi *  phase / env.phase_len), np.cos(2 * np.pi *  phase / env.phase_len)]
 
         motor_pos = state.motor.position[:]
         joint_pos = state.joint.position[:]
@@ -355,15 +360,9 @@ def run_udp(policy_files):
           new_orient = [-1 * x for x in new_orient]
 
         if env.clock:
-          if env.command_height:
-            ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height]))
-          else:
-            ext_state   = np.concatenate((clock, [speed, side_speed]))
+          ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, foot_cmd_height]))
         else:
-          if env.command_height:
-            ext_state   = np.concatenate(([speed], [side_speed], [cmd_height]))
-          else:
-            ext_state   = np.concatenate(([speed], [side_speed]))
+          ext_state   = np.concatenate(([speed], [side_speed], [cmd_height], [foot_cmd_height]))
 
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
@@ -461,12 +460,12 @@ def run_udp(policy_files):
             time.sleep(0.001)
         delay = (time.monotonic() - t) * 1000
 
-        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, ''), end='\r')
+        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, foot_cmd_height, ''), end='\r')
 
         # Track phase
         phase += phase_add
-        if phase >= len(env.trajectory):
-          phase = phase % len(env.trajectory) - 1
+        if phase >= env.phase_len:
+          phase = phase % env.phase_len - 1
           counter += 1
   finally:
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
