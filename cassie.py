@@ -356,11 +356,11 @@ class CassieEnv_v2:
     if pelvis_hgt < 0.02:
       pelvis_hgt = 0
 
-    pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
-
     ####################
     # SPEED COST TERMS #
     ####################
+
+    pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
 
     x_vel = np.abs(pelvis_vel[0] - self.speed)
     if x_vel < 0.05:
@@ -391,6 +391,25 @@ class CassieEnv_v2:
 
     foot_err = 10 * ((1 - np.inner(left_actual, left_actual_target) ** 2) + (1 - np.inner(right_actual, right_actual_target) ** 2))
 
+    ######################
+    # CLOCK REWARD TERMS #
+    ######################
+
+    clock1 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len),         0, 1) # left force,  right vel
+    clock2 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi), 0, 1) # right force, left vel
+
+    clock3 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi/2),     0, 1) # right touchdown
+    clock4 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + 3 * np.pi/2), 0, 1) # left touchdown
+
+    """
+    if clock3 > 0.99:
+      print("RIGHT TOUCHDOWN EVENT")
+      input()
+    if clock4 > 0.99:
+      print("LEFT TOUCHDOWN EVENT")
+      input()
+    """
+
     frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
@@ -398,15 +417,6 @@ class CassieEnv_v2:
 
     left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
     right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
-
-    pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
-
-    clock1 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len), 0, 1)         # left force,  right vel
-    clock2 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi), 0, 1) # right force, left vel
-
-    #####################
-    # FOOT REWARD TERMS #
-    #####################
 
     # Penalty which multiplies foot forces by 1 during swing, and 0 during stance.
     # (punish foot forces in the air)
@@ -445,8 +455,8 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
 
-    print("{:4.3f}".format(np.exp(-foot_frc_err)))
-   
+    pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
+
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
              0.250 * np.exp(-foot_frc_err) +                   \
