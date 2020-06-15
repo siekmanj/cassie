@@ -178,7 +178,7 @@ class CassieEnv_v2:
         self.phase = self.phase % self.phase_len - 1
         self.counter += 1
 
-    if self.speed < 0.05 and self.side_speed < 0.05:
+    if np.abs(self.speed) < 0.1 and np.abs(self.side_speed) < 0.05:
       self.standing = True
     else:
       self.standing = False
