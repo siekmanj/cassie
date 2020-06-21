@@ -88,11 +88,13 @@ class CassieSim:
             xfrc_array[i] = xfrc[i]
         cassie_sim_apply_force(self.c, xfrc_array, body)
 
-    def foot_pos(self, pos):
-        pos_array = (ctypes.c_double * 6)()
-        cassie_sim_foot_positions(self.c, pos_array)
-        for i in range(6):
-            pos[i] = pos_array[i]
+    def foot_pos(self):
+      pos = []
+      pos_array = (ctypes.c_double * 6)()
+      cassie_sim_foot_positions(self.c, pos_array)
+      for i in range(6):
+          pos.append(pos_array[i])
+      return pos
 
     def clear_forces(self):
         cassie_sim_clear_forces(self.c)
