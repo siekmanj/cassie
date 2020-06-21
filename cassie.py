@@ -106,8 +106,6 @@ class CassieEnv_v2:
     self.height      = 1.0
     self.foot_height = 0.05
 
-    self.standing = False
-
     # Record default dynamics parameters
     self.default_damping = self.sim.get_dof_damping()
     self.default_mass = self.sim.get_body_mass()
@@ -178,11 +176,6 @@ class CassieEnv_v2:
         self.phase = self.phase % self.phase_len - 1
         self.counter += 1
 
-    if np.abs(self.speed) < 0.1 and np.abs(self.side_speed) < 0.05:
-      self.standing = True
-    else:
-      self.standing = False
-
     reward = self.compute_reward(action)
 
     done = False
@@ -191,13 +184,13 @@ class CassieEnv_v2:
 
     state = self.get_full_state() 
 
-    if not self.standing and np.random.randint(300) == 0: # random changes to orientation
+    if np.random.randint(300) == 0: # random changes to orientation
       self.orient_add += np.random.uniform(-self.max_orient_change, self.max_orient_change)
 
     if np.random.randint(300) == 0: # random changes to commanded height
       self.height = np.random.uniform(self.min_height, self.max_height)
 
-    if not self.standing and np.random.randint(300) == 0: # random changes to commanded foot height
+    if np.random.randint(300) == 0: # random changes to commanded foot height
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
     if np.random.randint(300) == 0: # random changes to speed
@@ -206,7 +199,7 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
-    if not self.standing and np.random.randint(300) == 0: # random changes to clock speed
+    if np.random.randint(300) == 0: # random changes to clock speed
       new_freq = np.random.uniform(self.min_step_freq, self.max_step_freq)
       new_freq = np.clip(new_freq, 0.8 * np.abs(self.speed), None)
       self.phase_add = int(self.simrate * new_freq)
@@ -365,17 +358,13 @@ class CassieEnv_v2:
 
     pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
 
-    if self.standing:
-      x_vel = np.abs(pelvis_vel[0])
-      y_vel = np.abs(pelvis_vel[1])
-    else:
-      x_vel = np.abs(pelvis_vel[0] - self.speed)
-      if x_vel < 0.05:
-         x_vel = 0
+    x_vel = np.abs(pelvis_vel[0] - self.speed)
+    if x_vel < 0.05:
+       x_vel = 0
 
-      y_vel = np.abs(pelvis_vel[1] - self.side_speed)
-      if y_vel < 0.05:
-        y_vel = 0
+    y_vel = np.abs(pelvis_vel[1] - self.side_speed)
+    if y_vel < 0.05:
+      y_vel = 0
 
     x_vel *= 2
 
@@ -402,20 +391,9 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    clock1 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len),         0, 1) # left force,  right vel
-    clock2 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi), 0, 1) # right force, left vel
-
-    clock3 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi/2),     0, 1) # right touchdown
-    clock4 = np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + 3 * np.pi/2), 0, 1) # left touchdown
-
-    """
-    if clock3 > 0.99:
-      print("RIGHT TOUCHDOWN EVENT")
-      input()
-    if clock4 > 0.99:
-      print("LEFT TOUCHDOWN EVENT")
-      input()
-    """
+    omega = 0.5
+    clock1 = (omega+1) * np.clip(np.cos(2 * np.pi * self.phase / self.phase_len)         - omega, 0, 1) # left force,  right vel
+    clock2 = (omega+1) * np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - omega, 0, 1) # right force, left vel
 
     frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
@@ -464,23 +442,15 @@ class CassieEnv_v2:
 
     pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
 
-    if not self.standing:
-      reward = 0.000 + \
-               0.250 * np.exp(-(orientation_error + foot_err)) + \
-               0.250 * np.exp(-foot_frc_err) +                   \
-               0.150 * np.exp(-x_vel) +                          \
-               0.100 * np.exp(-y_vel) +                          \
-               0.100 * np.exp(-pelvis_hgt) +                     \
-               0.100 * np.exp(-foot_height_err) +                \
-               0.025 * np.exp(-ctrl_penalty) +                   \
-               0.025 * np.exp(-torque_penalty)
-    else:
-      reward = 0.000 + \
-               0.400 * np.exp(-(orientation_error + foot_err)) + \
-               0.200 * np.exp(-torque_penalty) +                 \
-               0.200 * np.exp(-(right_vel + left_vel)) +         \
-               0.100 * np.exp(-pelvis_hgt) +                     \
-               0.100 * np.exp(-ctrl_penalty)
+    reward = 0.000 + \
+             0.250 * np.exp(-(orientation_error + foot_err)) + \
+             0.250 * np.exp(-foot_frc_err) +                   \
+             0.150 * np.exp(-x_vel) +                          \
+             0.100 * np.exp(-y_vel) +                          \
+             0.100 * np.exp(-pelvis_hgt) +                     \
+             0.100 * np.exp(-foot_height_err) +                \
+             0.025 * np.exp(-ctrl_penalty) +                   \
+             0.025 * np.exp(-torque_penalty)
 
     return reward
 
