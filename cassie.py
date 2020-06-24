@@ -69,19 +69,19 @@ class CassieEnv_v2:
     self.max_orient_change = 0.2
 
     self.max_speed = 4.0
-    self.min_speed = -0.5
+    self.min_speed = -0.3
 
     self.max_side_speed  = 0.25
     self.min_side_speed  = -0.25
 
-    self.max_step_freq = 1.8
+    self.max_step_freq = 2
     self.min_step_freq = 0.9
 
-    self.max_height = 1.05
-    self.min_height = 0.7
+    self.max_height = 1.00
+    self.min_height = 0.8
 
-    self.max_foot_height = 0.25
-    self.min_foot_height = 0.02
+    self.max_foot_height = 0.13
+    self.min_foot_height = 0.05
 
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
@@ -359,7 +359,7 @@ class CassieEnv_v2:
     if y_vel < 0.05:
       y_vel = 0
 
-    x_vel *= 2
+    x_vel *= 4
 
     ##########################
     # ORIENTATION COST TERMS #
@@ -384,7 +384,7 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    omega = 0.1
+    omega = 0.02
     clock1 = (omega+1) * np.clip(np.cos(2 * np.pi * self.phase / self.phase_len)         - omega, 0, 1) # left force,  right vel
     clock2 = (omega+1) * np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - omega, 0, 1) # right force, left vel
 
@@ -438,10 +438,10 @@ class CassieEnv_v2:
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
              0.200 * np.exp(-foot_frc_err) +                   \
-             0.150 * np.exp(-x_vel) +                          \
+             0.200 * np.exp(-x_vel) +                          \
              0.100 * np.exp(-y_vel) +                          \
              0.100 * np.exp(-pelvis_hgt) +                     \
-             0.100 * np.exp(-foot_height_err) +                \
+             0.050 * np.exp(-foot_height_err) +                \
              0.050 * np.exp(-pelvis_acc) +                     \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
