@@ -68,7 +68,7 @@ class CassieEnv_v2:
 
     self.max_orient_change = 0.2
 
-    self.max_speed = 4.0
+    self.max_speed = 3
     self.min_speed = -0.3
 
     self.max_side_speed  = 0.25
@@ -425,15 +425,16 @@ class CassieEnv_v2:
     if self.last_torque is None:
       torque_penalty = 0
     else:
-      torque_penalty = (sum(np.abs(self.last_torque - torque)) / len(torque)) / 7
+      torque_penalty = 0.5 * (sum(np.abs(self.last_torque - torque)) / len(torque))
 
     # Action cost term
     if self.last_action is None:
       ctrl_penalty = 0
     else:
-      ctrl_penalty = sum(np.abs(self.last_action - action)) / len(action)
+      ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    pelvis_acc = (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum()) / 10
+    pelvis_acc = 0.25 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    #print('{:5.2f}'.format(np.exp(-pelvis_acc)))
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
