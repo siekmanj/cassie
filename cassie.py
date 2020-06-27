@@ -384,9 +384,9 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    omega = 0.02
-    clock1 = (omega+1) * np.clip(np.cos(2 * np.pi * self.phase / self.phase_len)         - omega, 0, 1) # left force,  right vel
-    clock2 = (omega+1) * np.clip(np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - omega, 0, 1) # right force, left vel
+    omega = -0.01
+    clock1 = np.clip((omega+1) * np.cos(2 * np.pi * self.phase / self.phase_len)         - omega, 0, 1) # left force,  right vel
+    clock2 = np.clip((omega+1) * np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - omega, 0, 1) # right force, left vel
 
     frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
