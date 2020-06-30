@@ -27,10 +27,10 @@ cassie_mujoco_init(str.encode(_dir_path+"/cassie.xml"))
 class CassieSim:
     def __init__(self, modelfile):
         self.c = cassie_sim_init(modelfile.encode('utf-8'))
-        self.nv = 32
-        self.nbody = 26
-        self.nq = 35
-        self.ngeom = 35
+        self.nv = cassie_sim_nv(self.c)
+        self.nbody = cassie_sim_nbody(self.c)
+        self.nq = cassie_sim_nq(self.c)
+        self.ngeom = cassie_sim_ngeom(self.c)
 
     def step(self, u):
         y = cassie_out_t()

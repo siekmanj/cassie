@@ -308,9 +308,9 @@ class CassieEnv_v2:
           self.sim.set_geom_friction(np.clip(fric_noise, 0, None))
           self.sim.set_geom_quat(geom_quat)
       else:
-          self.sim.set_dof_damping(self.default_damping)
           self.sim.set_body_mass(self.default_mass)
           self.sim.set_body_ipos(self.default_ipos)
+          self.sim.set_dof_damping(self.default_damping)
           self.sim.set_geom_friction(self.default_fric)
           self.sim.set_geom_quat(self.default_quat)
 

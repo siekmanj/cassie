@@ -482,6 +482,22 @@ cassie_sim_set_const = _libraries['./libcassiemujoco.so'].cassie_sim_set_const
 cassie_sim_set_const.restype = None
 cassie_sim_set_const.argtypes = [POINTER_T(struct_cassie_sim)]
 
+cassie_sim_nv = _libraries['./libcassiemujoco.so'].cassie_sim_nv
+cassie_sim_nv.restype = ctypes.c_int32
+cassie_sim_nv.argtypes = [POINTER_T(struct_cassie_sim)]
+
+cassie_sim_nbody = _libraries['./libcassiemujoco.so'].cassie_sim_nbody
+cassie_sim_nbody.restype = ctypes.c_int32
+cassie_sim_nbody.argtypes = [POINTER_T(struct_cassie_sim)]
+
+cassie_sim_ngeom = _libraries['./libcassiemujoco.so'].cassie_sim_ngeom
+cassie_sim_ngeom.restype = ctypes.c_int32
+cassie_sim_ngeom.argtypes = [POINTER_T(struct_cassie_sim)]
+
+cassie_sim_nq = _libraries['./libcassiemujoco.so'].cassie_sim_nq
+cassie_sim_nq.restype = ctypes.c_int32
+cassie_sim_nq.argtypes = [POINTER_T(struct_cassie_sim)]
+
 class struct_c__SA_pd_motor_in_t(ctypes.Structure):
     _pack_ = True # source:False
     _fields_ = [
@@ -742,4 +758,5 @@ __all__ = \
     'cassie_sim_body_ipos', 'cassie_sim_set_body_ipos',
     'cassie_sim_geom_friction', 'cassie_sim_set_geom_friction',
     'cassie_sim_set_const', 'cassie_sim_geom_rgba', 'cassie_sim_set_geom_rgba',
-    'cassie_sim_geom_quat', 'cassie_sim_set_geom_quat']
+    'cassie_sim_geom_quat', 'cassie_sim_set_geom_quat', 'cassie_sim_nv',
+    'cassie_sim_nbody', 'cassie_sim_nq', 'cassie_sim_ngeom']
