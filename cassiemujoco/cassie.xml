@@ -214,11 +214,6 @@
     </body>
 
     <!-- Add any other moving bodies after the Cassie definition -->
-    <body name='box' pos='2 0 0.2'>
-      <freejoint/>
-      <geom type='box' size='1 1 0.1' mass='30' class='obstacle'/>
-    </body>
-
   </worldbody>
 
   <equality>
