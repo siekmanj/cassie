@@ -384,9 +384,13 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    omega = 0
-    clock1 = np.clip((omega+1) * np.cos(2 * np.pi * self.phase / self.phase_len)         - omega, 0, 1) # left force,  right vel
-    clock2 = np.clip((omega+1) * np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - omega, 0, 1) # right force, left vel
+    alpha = 0.25
+    beta  = -alpha
+    clock1_swing  = np.clip((alpha + 1) * np.cos(2 * np.pi * self.phase / self.phase_len)         - alpha, 0, 1) # left force penalty during swing
+    clock1_stance = np.clip((beta  + 1) * np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - beta,  0, 1) # left vel penalty during stance
+
+    clock2_swing  = np.clip((alpha + 1) * np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - alpha, 0, 1) # right force penalty during swing
+    clock2_stance = np.clip((beta  + 1) * np.cos(2 * np.pi * self.phase / self.phase_len)         - beta,  0, 1) # right vel penalty during stance
 
     frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
@@ -398,13 +402,13 @@ class CassieEnv_v2:
 
     # Penalty which multiplies foot forces by 1 during swing, and 0 during stance.
     # (punish foot forces in the air)
-    left_frc_penalty  = np.abs(clock1 * left_frc)
-    right_frc_penalty = np.abs(clock2 * right_frc)
+    left_frc_penalty  = np.abs(clock1_swing * left_frc)
+    right_frc_penalty = np.abs(clock2_swing * right_frc)
 
     # Penalty which multiplies foot velocities by 1 during stance, and 0 during swing.
     # (punish foot velocities when foot is on the ground)
-    left_vel_penalty  = np.abs(clock2 * left_vel)
-    right_vel_penalty = np.abs(clock1 * right_vel)
+    left_vel_penalty  = np.abs(clock1_stance * left_vel)
+    right_vel_penalty = np.abs(clock2_stance * right_vel)
 
     left_penalty  = left_frc_penalty + left_vel_penalty
     right_penalty = right_frc_penalty + right_vel_penalty
@@ -414,7 +418,8 @@ class CassieEnv_v2:
     lhgt = sim_height + self.cassie_state.leftFoot.position[:][2]
     rhgt = sim_height + self.cassie_state.rightFoot.position[:][2]
 
-    foot_height_err = (clock1 * np.abs(lhgt - self.foot_height) + clock2 * np.abs(rhgt - self.foot_height))*6
+    foot_height_err = 6 * (clock1_swing * np.abs(lhgt - self.foot_height) + \
+                           clock2_swing * np.abs(rhgt - self.foot_height))
 
     ########################
     # JERKINESS COST TERMS #
