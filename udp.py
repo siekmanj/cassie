@@ -235,10 +235,14 @@ def run_udp(policy_files):
           raw_side_spd = -state.radio.channel[1]
           side_speed = raw_side_spd * max_y_speed if raw_side_spd > 0 else -raw_side_spd * min_y_speed
 
-          phase_add = env.simrate + env.simrate * (state.radio.channel[7] + 0.75)/2
+          phase_add = env.simrate + env.simrate * (state.radio.channel[4] + 0.75)/2
+          
+          cmd_height = 0.8 + (state.radio.channel[6] + 1)/10
 
-          pitch_bias = state.radio.channel[5]/6
-          policy_idx = int(state.radio.channel[10])
+          cmd_foot_height = 0.03 + (state.radio.channel[7] + 1)/15
+
+          pitch_bias      = state.radio.channel[5]/6
+          policy_idx      = int(state.radio.channel[10])
           if policy_idx == -1:
               policy_idx = None
 
