@@ -192,13 +192,15 @@ class CassieEnv_v2:
 
     if np.random.randint(300) == 0: # random changes to speed
       self.speed = np.random.uniform(self.min_speed, self.max_speed)
+      if self.speed > 1 and self.phase_add / self.simrate < self.speed:
+        self.phase_add = int(self.simrate * np.clip(self.speed, 1, self.max_step_freq))
 
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
     if np.random.randint(300) == 0: # random changes to clock speed
       new_freq = np.random.uniform(self.min_step_freq, self.max_step_freq)
-      new_freq = np.clip(new_freq, 0.8 * np.abs(self.speed), None)
+      new_freq = np.clip(new_freq, np.abs(self.speed), None)
       self.phase_add = int(self.simrate * new_freq)
 
     self.last_action = action
@@ -384,13 +386,12 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    alpha = 0.25
-    beta  = -alpha
-    clock1_swing  = np.clip((alpha + 1) * np.cos(2 * np.pi * self.phase / self.phase_len)         - alpha, 0, 1) # left force penalty during swing
-    clock1_stance = np.clip((beta  + 1) * np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - beta,  0, 1) # left vel penalty during stance
+    ratio         = np.interp(self.speed, (self.min_speed, self.max_speed), (0.6, 0.4)) # stance to swing ratio
+    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.05, flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.05, flip=True)
 
-    clock2_swing  = np.clip((alpha + 1) * np.cos(2 * np.pi * self.phase / self.phase_len + np.pi) - alpha, 0, 1) # right force penalty during swing
-    clock2_stance = np.clip((beta  + 1) * np.cos(2 * np.pi * self.phase / self.phase_len)         - beta,  0, 1) # right vel penalty during stance
+    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.05, flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.05, flip=False)
 
     frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
@@ -479,6 +480,20 @@ class CassieEnv_v2:
   def get_clock(self):
         return  [np.sin(2 * np.pi *  self.phase / self.phase_len),
                  np.cos(2 * np.pi *  self.phase / self.phase_len)]
+
+  def reward_clock(self, ratio=0.5, saturation=0.05, flip=False):
+    x = self.phase / self.phase_len
+    if flip:
+      x = np.fmod(x + 0.5, 1)
+
+    slope = 1 / ((ratio / 2) - saturation)
+
+    if x < saturation + ratio/2:
+      return np.clip((-slope * (x - saturation) + 1),    0, 1)
+    elif x > 1 - (saturation + ratio/2):
+      return np.clip((slope * (x - 1 + saturation) + 1), 0, 1)
+    else:
+      return 0
 
   def get_full_state(self):
       qpos = np.copy(self.sim.qpos())
