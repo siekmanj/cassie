@@ -386,7 +386,7 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    ratio         = np.interp(self.speed, (self.min_speed, self.max_speed), (0.6, 0.4)) # stance to swing ratio
+    ratio         = np.interp(self.speed, (self.min_speed, self.max_speed), (0.75, 0.25)) # stance to swing ratio
     clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.05, flip=False)
     clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.05, flip=True)
 
