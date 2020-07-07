@@ -176,7 +176,7 @@ def run_udp(policy_files):
   max_y_speed  =  0.25
   min_y_speed  = -0.25
   cmd_height   = 0.9
-  foot_cmd_height = 0.05
+  cmd_foot_height = 0.05
   logged       = True
   mirror       = False
   last_torque  = None
@@ -282,9 +282,9 @@ def run_udp(policy_files):
             if c == 'h':
               cmd_height -= 0.01
             if c == 'c':
-              foot_cmd_height += 0.01
+              cmd_foot_height += 0.01
             if c == 'v':
-              foot_cmd_height -= 0.01
+              cmd_foot_height -= 0.01
             if c.isdigit():
               if int(c) > len(policies) - 1:
                 policy_idx = None
@@ -364,9 +364,9 @@ def run_udp(policy_files):
           new_orient = [-1 * x for x in new_orient]
 
         if env.clock:
-          ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, foot_cmd_height]))
+          ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, cmd_foot_height]))
         else:
-          ext_state   = np.concatenate(([speed], [side_speed], [cmd_height], [foot_cmd_height]))
+          ext_state   = np.concatenate(([speed], [side_speed], [cmd_height], [cmd_foot_height]))
 
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
@@ -464,7 +464,7 @@ def run_udp(policy_files):
             time.sleep(0.001)
         delay = (time.monotonic() - t) * 1000
 
-        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, foot_cmd_height, ''), end='\r')
+        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ''), end='\r')
 
         # Track phase
         phase += phase_add
