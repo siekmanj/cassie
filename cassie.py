@@ -199,7 +199,7 @@ class CassieEnv_v2:
 
     if np.random.randint(300) == 0: # random changes to clock speed
       new_freq = np.random.uniform(self.min_step_freq, self.max_step_freq)
-      new_freq = np.clip(new_freq, np.abs(self.speed), None)
+      new_freq = np.clip(new_freq, np.abs(self.speed), self.max_step_freq)
       self.phase_add = int(self.simrate * new_freq)
 
     #self.ratio = np.interp(self.speed, (self.min_speed, self.max_speed), (0.75, 0.25)) # stance to swing ratio
