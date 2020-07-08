@@ -68,20 +68,20 @@ class CassieEnv_v2:
 
     self.max_orient_change = 0.2
 
-    self.max_speed = 3
+    self.max_speed = 3.7
     self.min_speed = -0.5
 
     self.max_side_speed  = 0.25
     self.min_side_speed  = -0.25
 
-    self.max_step_freq = 1.7
+    self.max_step_freq = 1.5
     self.min_step_freq = 0.9
 
     self.max_height = 1.00
     self.min_height = 0.8
 
     self.max_foot_height = 0.13
-    self.min_foot_height = 0.01
+    self.min_foot_height = 0.03
 
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
@@ -179,8 +179,6 @@ class CassieEnv_v2:
     if reward < 0.45:
         done = True
 
-    state = self.get_full_state() 
-
     if np.random.randint(300) == 0: # random changes to orientation
       self.orient_add += np.random.uniform(-self.max_orient_change, self.max_orient_change)
 
@@ -203,6 +201,10 @@ class CassieEnv_v2:
       new_freq = np.random.uniform(self.min_step_freq, self.max_step_freq)
       new_freq = np.clip(new_freq, np.abs(self.speed), None)
       self.phase_add = int(self.simrate * new_freq)
+
+    #self.ratio = np.interp(self.speed, (self.min_speed, self.max_speed), (0.75, 0.25)) # stance to swing ratio
+
+    state = self.get_full_state() 
 
     self.last_action = action
     self.last_pelvis_rot = self.cassie_state.pelvis.rotationalVelocity[:]
@@ -389,12 +391,12 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    ratio         = np.interp(self.speed, (self.min_speed, self.max_speed), (0.75, 0.25)) # stance to swing ratio
-    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.05, flip=False)
-    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.05, flip=True)
+    ratio         = np.interp(np.abs(self.speed), (0, self.max_speed), (0.25, 0.75)) # stance to swing punishment ratio
+    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.1 * ratio,     flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.1 * (1-ratio), flip=True)
 
-    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.05, flip=True)
-    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.05, flip=False)
+    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.1 * ratio,     flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.1 * (1-ratio), flip=False)
 
     frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
