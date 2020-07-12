@@ -191,18 +191,19 @@ class CassieEnv_v2:
     if np.random.randint(90) == 0: # random changes to speed
       self.speed += np.random.uniform(-0.1, 0.7)
       self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
-      if self.speed > 1 and self.phase_add / self.simrate < self.speed:
-        self.phase_add = int(self.simrate * np.clip(self.speed, 1, self.max_step_freq))
+      #if self.speed > 1 and self.phase_add / self.simrate < self.speed:
+      #  self.phase_add = int(self.simrate * np.clip(self.speed, 1, self.max_step_freq))
 
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
-    if np.random.randint(300) == 0: # random changes to clock speed
-      new_freq = np.random.uniform(self.min_step_freq, self.max_step_freq)
-      new_freq = np.clip(new_freq, np.abs(self.speed), self.max_step_freq)
-      self.phase_add = int(self.simrate * new_freq)
+    #if np.random.randint(300) == 0: # random changes to clock speed
+    #  new_freq = np.random.uniform(self.min_step_freq, self.max_step_freq)
+    #  new_freq = np.clip(new_freq, np.abs(self.speed), self.max_step_freq)
+    #  self.phase_add = int(self.simrate * new_freq)
 
-    #self.ratio = np.interp(self.speed, (self.min_speed, self.max_speed), (0.75, 0.25)) # stance to swing ratio
+    self.phase_add = int(self.simrate * (np.interp(np.abs(self.speed), (1, 2), (1, 1.5))))
+    #print(self.phase_add, self.speed)
 
     state = self.get_full_state() 
 
@@ -333,7 +334,8 @@ class CassieEnv_v2:
       self.height      = np.random.uniform(self.min_height, self.max_height)
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
-      self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
+      #self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
+      self.phase_add = int(self.simrate * (np.interp(np.abs(self.speed), (1, 2), (1, 1.5))))
 
       self.last_action = None
       self.last_torque = None
