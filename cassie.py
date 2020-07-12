@@ -43,8 +43,8 @@ class CassieEnv_v2:
     self.observation_space = np.zeros(self._obs + self._obs * self.history)
 
     if impedance:
-      self.action_space = np.zeros(30)
-      #self.action_space = np.zeros(20)
+      #self.action_space = np.zeros(30)
+      self.action_space = np.zeros(20)
     else:
       self.action_space = np.zeros(10)
 
@@ -89,12 +89,12 @@ class CassieEnv_v2:
     self.encoder_noise = 0.01
 
     self.damping_low = 0.3
-    self.damping_high = 5.0
+    self.damping_high = 3.0
 
-    self.mass_low = 0.3
-    self.mass_high = 1.7
+    self.mass_low = 0.5
+    self.mass_high = 1.5
 
-    self.fric_low = 0.3
+    self.fric_low = 0.4
     self.fric_high = 1.1
 
     self.speed       = 0
@@ -188,8 +188,8 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded foot height
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
-    if np.random.randint(60) == 0: # random changes to speed
-      self.speed += np.random.uniform(-0.2, 0.9)
+    if np.random.randint(90) == 0: # random changes to speed
+      self.speed += np.random.uniform(-0.1, 0.7)
       self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
       if self.speed > 1 and self.phase_add / self.simrate < self.speed:
         self.phase_add = int(self.simrate * np.clip(self.speed, 1, self.max_step_freq))
@@ -391,7 +391,7 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    ratio         = np.interp(np.abs(self.speed), (0, self.max_speed), (0.25, 0.75)) # stance to swing punishment ratio
+    ratio         = np.interp(np.abs(self.speed), (0, self.max_speed), (0.4, 0.7)) # stance to swing punishment ratio
     clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.1 * ratio,     flip=False)
     clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.1 * (1-ratio), flip=True)
 
@@ -400,8 +400,8 @@ class CassieEnv_v2:
 
     frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
-    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 250)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 210)
+    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 210)
 
     left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
     right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
