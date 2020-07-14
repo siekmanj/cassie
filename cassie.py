@@ -43,8 +43,8 @@ class CassieEnv_v2:
     self.observation_space = np.zeros(self._obs + self._obs * self.history)
 
     if impedance:
-      #self.action_space = np.zeros(30)
-      self.action_space = np.zeros(20)
+      self.action_space = np.zeros(30)
+      #self.action_space = np.zeros(20)
     else:
       self.action_space = np.zeros(10)
 
@@ -68,11 +68,11 @@ class CassieEnv_v2:
 
     self.max_orient_change = 0.2
 
-    self.max_speed = 3.7
+    self.max_speed = 4.0
     self.min_speed = -0.5
 
-    self.max_side_speed  = 0.25
-    self.min_side_speed  = -0.25
+    self.max_side_speed  = 0.3
+    self.min_side_speed  = -0.3
 
     self.max_step_freq = 1.5
     self.min_step_freq = 0.9
@@ -89,7 +89,7 @@ class CassieEnv_v2:
     self.encoder_noise = 0.01
 
     self.damping_low = 0.3
-    self.damping_high = 3.0
+    self.damping_high = 5.0
 
     self.mass_low = 0.5
     self.mass_high = 1.5
@@ -199,8 +199,6 @@ class CassieEnv_v2:
 
     if np.random.randint(300) == 0: # random changes to clock speed
       self.phase_add = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
-
-    print(self.phase_add, self.speed)
 
     state = self.get_full_state() 
 
@@ -326,13 +324,11 @@ class CassieEnv_v2:
       self.cassie_state = self.sim.step_pd(self.u)
 
       self.orient_add  = 0
-      self.speed       = np.random.uniform(self.min_speed, 0.7)
+      self.speed       = np.random.uniform(self.min_speed, self.max_speed)
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
-
-      #self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
-      self.phase_add = int(self.simrate * (np.interp(np.abs(self.speed), (1, 2), (1, 1.5))))
+      self.phase_add   = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
 
       self.last_action = None
       self.last_torque = None
@@ -397,10 +393,10 @@ class CassieEnv_v2:
     clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=True)
     clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=False)
 
-    frc_speed_coef = max(self.speed), 1)
+    frc_speed_coef = max(self.speed, 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 210)
-    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 210)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
+    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 250)
 
     left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
     right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
