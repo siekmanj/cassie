@@ -486,6 +486,7 @@ class CassieEnv_v2:
                  np.cos(2 * np.pi *  self.phase / self.phase_len)]
 
   def reward_clock(self, ratio=0.5, saturation=0.05, flip=False):
+    minval = 1e-1
     x = self.phase / self.phase_len
     if flip:
       x = np.fmod(x + 0.5, 1)
@@ -493,11 +494,11 @@ class CassieEnv_v2:
     slope = 1 / ((ratio / 2) - saturation)
 
     if x < saturation + ratio/2:
-      return np.clip((-slope * (x - saturation) + 1),    0, 1)
+      return np.clip((-slope * (x - saturation) + 1),    minval, 1)
     elif x > 1 - (saturation + ratio/2):
-      return np.clip((slope * (x - 1 + saturation) + 1), 0, 1)
+      return np.clip((slope * (x - 1 + saturation) + 1), minval, 1)
     else:
-      return 0
+      return minval
 
   def bound_freq(self, speed, freq=None, generate_new=False):
     lower = np.interp(np.abs(speed), (0, 3), (0.9, 1.5))
