@@ -188,22 +188,19 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded foot height
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
-    if np.random.randint(90) == 0: # random changes to speed
-      self.speed += np.random.uniform(-0.1, 0.7)
-      self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
-      #if self.speed > 1 and self.phase_add / self.simrate < self.speed:
-      #  self.phase_add = int(self.simrate * np.clip(self.speed, 1, self.max_step_freq))
+    if np.random.randint(300) == 0: # random changes to speed
+      self.speed = np.random.uniform(self.min_speed, self.max_speed)
+      #self.speed += np.random.uniform(-0.1, 0.5)
+      #self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
+      self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
 
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
-    #if np.random.randint(300) == 0: # random changes to clock speed
-    #  new_freq = np.random.uniform(self.min_step_freq, self.max_step_freq)
-    #  new_freq = np.clip(new_freq, np.abs(self.speed), self.max_step_freq)
-    #  self.phase_add = int(self.simrate * new_freq)
+    if np.random.randint(300) == 0: # random changes to clock speed
+      self.phase_add = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
 
-    self.phase_add = int(self.simrate * (np.interp(np.abs(self.speed), (1, 2), (1, 1.5))))
-    #print(self.phase_add, self.speed)
+    print(self.phase_add, self.speed)
 
     state = self.get_full_state() 
 
@@ -393,14 +390,14 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    ratio         = np.interp(np.abs(self.speed), (0, self.max_speed), (0.4, 0.7)) # stance to swing punishment ratio
-    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.1 * ratio,     flip=False)
-    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.1 * (1-ratio), flip=True)
+    ratio         = np.interp(np.abs(self.speed), (0, self.max_speed), (0.45, 0.75)) # stance to swing punishment ratio
+    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=True)
 
-    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.1 * ratio,     flip=True)
-    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.1 * (1-ratio), flip=False)
+    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=False)
 
-    frc_speed_coef = max(np.abs(pelvis_vel[0]), 1)
+    frc_speed_coef = max(self.speed), 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 210)
     right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 210)
@@ -457,9 +454,9 @@ class CassieEnv_v2:
              0.200 * np.exp(-foot_frc_err) +                   \
              0.200 * np.exp(-x_vel) +                          \
              0.100 * np.exp(-y_vel) +                          \
-             0.100 * np.exp(-pelvis_hgt) +                     \
+             0.100 * np.exp(-pelvis_acc) +                     \
+             0.050 * np.exp(-pelvis_hgt) +                     \
              0.050 * np.exp(-foot_height_err) +                \
-             0.050 * np.exp(-pelvis_acc) +                     \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
@@ -505,6 +502,18 @@ class CassieEnv_v2:
       return np.clip((slope * (x - 1 + saturation) + 1), 0, 1)
     else:
       return 0
+
+  def bound_freq(self, speed, freq=None, generate_new=False):
+    lower = np.interp(np.abs(speed), (0, 3), (0.9, 1.5))
+    upper = np.interp(np.abs(speed), (2, 3), (1.5, 1.7))
+
+    if generate_new:
+      freq = np.random.uniform(lower, upper)
+    elif freq is None:
+      freq = self.phase_add / self.simrate
+    freq = np.clip(freq, lower, upper)
+
+    return freq
 
   def get_full_state(self):
       qpos = np.copy(self.sim.qpos())
