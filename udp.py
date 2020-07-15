@@ -212,9 +212,11 @@ def run_udp(policy_files):
 
           # Switch the operation mode based on the toggle next to STO
           if state.radio.channel[9] < -0.5: # towards operator means damping shutdown mode
-              operation_mode = 2
+            operation_mode = 2
+            speed = 0
           elif state.radio.channel[9] > 0.5: # away from the operator means zero hidden states
             operation_mode = 1
+            speed = 0
           else:                              # Middle means normal walking
             operation_mode = 0
 
@@ -229,9 +231,10 @@ def run_udp(policy_files):
               ESTOP = False
               logged = False
 
-          raw_spd = (state.radio.channel[0])
-          if np.abs(raw_speed) > 0.05:
-            speed += raw_spd * 0.05 if raw_spd > 0 else -raw_spd * 0.05
+          raw_spd = (state.radio.channel[0]) * 0.1
+          if np.abs(raw_spd) < 0.01:
+            raw_spd = 0
+          speed += raw_spd * 0.1
 
           raw_side_spd = -state.radio.channel[1]
           side_speed = raw_side_spd * max_y_speed if raw_side_spd > 0 else -raw_side_spd * min_y_speed
@@ -243,9 +246,8 @@ def run_udp(policy_files):
           cmd_foot_height = 0.03 + (state.radio.channel[7] + 1)/15
 
           pitch_bias = state.radio.channel[5]/6
-          policy_idx = int(state.radio.channel[10])
-          if policy_idx == -1:
-              policy_idx = None
+          mirror = int(state.radio.channel[10]) > 0
+          policy_idx = None
 
         else:
           """ 
