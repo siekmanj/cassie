@@ -466,6 +466,7 @@ def run_udp(policy_files):
         delay = (time.monotonic() - t) * 1000
 
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
+        #phase_add = int(env.simrate * (np.interp(np.abs(speed), (1, 2), (1, 1.5))))
         print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ''), end='\r')
 
         # Track phase
