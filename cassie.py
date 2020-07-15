@@ -393,7 +393,7 @@ class CassieEnv_v2:
     clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=True)
     clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=False)
 
-    frc_speed_coef = max(self.speed, 1)
+    frc_speed_coef = max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
     right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 250)
