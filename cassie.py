@@ -395,8 +395,8 @@ class CassieEnv_v2:
 
     frc_speed_coef = max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
-    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 250)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 350)
+    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 350)
 
     left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
     right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
@@ -439,11 +439,12 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    if self.last_pelvis_rot is None:
-      pelvis_rot_penalty = 0
-    else:
-      pelvis_rot_penalty = 2.0 * sum(np.abs(self.last_pelvis_rot - np.array(self.cassie_state.pelvis.rotationalVelocity[:]))) 
-    pelvis_acc = (pelvis_rot_penalty + 0.2 * np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    #if self.last_pelvis_rot is None:
+    #  pelvis_rot_penalty = 0
+    #else:
+    #  pelvis_rot_penalty = 2.0 * sum(np.abs(self.last_pelvis_rot - np.array(self.cassie_state.pelvis.rotationalVelocity[:]))) 
+    #pelvis_acc = (pelvis_rot_penalty + 0.2 * np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.25 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_sate.pelvis.translationalAcceleration[:]).sum())
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
