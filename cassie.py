@@ -444,7 +444,7 @@ class CassieEnv_v2:
     #else:
     #  pelvis_rot_penalty = 2.0 * sum(np.abs(self.last_pelvis_rot - np.array(self.cassie_state.pelvis.rotationalVelocity[:]))) 
     #pelvis_acc = (pelvis_rot_penalty + 0.2 * np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
-    pelvis_acc = 0.25 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_sate.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.25 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
@@ -487,7 +487,7 @@ class CassieEnv_v2:
                  np.cos(2 * np.pi *  self.phase / self.phase_len)]
 
   def reward_clock(self, ratio=0.5, saturation=0.05, flip=False):
-    minval = 1e-1
+    minval = 5e-2
     x = self.phase / self.phase_len
     if flip:
       x = np.fmod(x + 0.5, 1)
