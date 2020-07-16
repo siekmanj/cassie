@@ -188,10 +188,10 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded foot height
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
-    if np.random.randint(300) == 0: # random changes to speed
-      self.speed = np.random.uniform(self.min_speed, self.max_speed)
-      #self.speed += np.random.uniform(-0.1, 0.5)
-      #self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
+    if np.random.randint(60) == 0: # random changes to speed
+      #self.speed = np.random.uniform(self.min_speed, self.max_speed)
+      self.speed += np.random.uniform(-0.1, 0.7)
+      self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
       self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
 
     if np.random.randint(300) == 0: # random changes to sidespeed
