@@ -444,7 +444,8 @@ class CassieEnv_v2:
     #else:
     #  pelvis_rot_penalty = 2.0 * sum(np.abs(self.last_pelvis_rot - np.array(self.cassie_state.pelvis.rotationalVelocity[:]))) 
     #pelvis_acc = (pelvis_rot_penalty + 0.2 * np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
-    pelvis_acc = 0.25 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.05 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    #print('acc {:5.3f}'.format(np.exp(-pelvis_acc)))
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
