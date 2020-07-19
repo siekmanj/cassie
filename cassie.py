@@ -190,7 +190,7 @@ class CassieEnv_v2:
 
     if np.random.randint(60) == 0: # random changes to speed
       #self.speed = np.random.uniform(self.min_speed, self.max_speed)
-      self.speed += np.random.uniform(-0.1, 0.7)
+      self.speed += np.random.uniform(-0.1, 0.6)
       self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
       self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
 
@@ -395,8 +395,8 @@ class CassieEnv_v2:
 
     frc_speed_coef = max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 350)
-    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 350)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
+    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 250)
 
     left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
     right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
@@ -487,7 +487,7 @@ class CassieEnv_v2:
                  np.cos(2 * np.pi *  self.phase / self.phase_len)]
 
   def reward_clock(self, ratio=0.5, saturation=0.05, flip=False):
-    minval = 5e-2
+    minval = 1e-2
     x = self.phase / self.phase_len
     if flip:
       x = np.fmod(x + 0.5, 1)
