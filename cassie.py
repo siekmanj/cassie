@@ -103,6 +103,9 @@ class CassieEnv_v2:
     self.height      = 1.0
     self.foot_height = 0.05
 
+    self.min_swing_ratio = 0.40
+    self.max_swing_ratio = 0.75
+
     # Record default dynamics parameters
     self.default_damping = self.sim.get_dof_damping()
     self.default_mass = self.sim.get_body_mass()
@@ -387,6 +390,7 @@ class CassieEnv_v2:
     ######################
 
     ratio         = np.interp(np.abs(self.speed), (0, self.max_speed), (0.45, 0.75)) # stance to swing punishment ratio
+    #print(self.speed, self.bound_ratio(self.speed, generate_new=True))
     clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=False)
     clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=True)
 
@@ -439,13 +443,7 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    #if self.last_pelvis_rot is None:
-    #  pelvis_rot_penalty = 0
-    #else:
-    #  pelvis_rot_penalty = 2.0 * sum(np.abs(self.last_pelvis_rot - np.array(self.cassie_state.pelvis.rotationalVelocity[:]))) 
-    #pelvis_acc = (pelvis_rot_penalty + 0.2 * np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
     pelvis_acc = 0.05 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
-    #print('acc {:5.3f}'.format(np.exp(-pelvis_acc)))
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
@@ -459,17 +457,6 @@ class CassieEnv_v2:
              0.025 * np.exp(-torque_penalty)
 
     return reward
-
-  def get_dynamics(self):
-    damping = self.sim.get_dof_damping()
-    mass    = self.sim.get_body_mass()
-    fric    = self.sim.get_geom_friction()[0]
-    quat    = quaternion2euler(self.sim.get_geom_quat())[:2]
-
-    motor_encoder_noise = np.copy(self.motor_encoder_noise)
-    joint_encoder_noise = np.copy(self.joint_encoder_noise)
-
-    return np.hstack([fric])
 
   def get_friction(self):
     return np.hstack([self.sim.get_geom_friction()[0]])
@@ -513,6 +500,17 @@ class CassieEnv_v2:
     freq = np.clip(freq, lower, upper)
 
     return freq
+
+  def bound_ratio(self, speed, ratio=None, generate_new=False):
+    lower = np.interp(np.abs(speed), (0, 2), (0.45, 0.75))
+    upper = 0.75
+
+    if generate_new:
+      ratio = np.random.uniform(lower, upper)
+
+    ratio = np.clip(ratio, lower, upper)
+
+    return ratio
 
   def get_full_state(self):
       qpos = np.copy(self.sim.qpos())
