@@ -395,8 +395,8 @@ class CassieEnv_v2:
 
     frc_speed_coef = max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 250)
-    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 250)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 350)
+    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 350)
 
     left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
     right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
