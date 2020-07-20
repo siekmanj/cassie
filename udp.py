@@ -259,7 +259,7 @@ def run_udp(policy_files):
             c = sys.stdin.read(1)
             if c == 'w':
               speed += 0.1
-              phase_add = np.clip(phase_add, (0.6 * speed) * 60, None)
+              #phase_add = np.clip(phase_add, (0.6 * speed) * 60, None)
             if c == 's':
               speed -= 0.1
             if c == 'q':
