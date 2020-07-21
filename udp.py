@@ -259,7 +259,6 @@ def run_udp(policy_files):
             c = sys.stdin.read(1)
             if c == 'w':
               speed += 0.1
-              #phase_add = np.clip(phase_add, (0.6 * speed) * 60, None)
             if c == 's':
               speed -= 0.1
             if c == 'q':
@@ -284,9 +283,9 @@ def run_udp(policy_files):
               cmd_height += 0.01
             if c == 'h':
               cmd_height -= 0.01
-            if c == 'c':
+            if c == 'u':
               cmd_foot_height += 0.01
-            if c == 'v':
+            if c == 'j':
               cmd_foot_height -= 0.01
             if c.isdigit():
               if int(c) > len(policies) - 1:
@@ -375,14 +374,6 @@ def run_udp(policy_files):
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
         pelvis_hgt   = state.pelvis.position[2] - state.terrain.height
 
-        #torque = np.asarray(state.motor.torque[:])
-        #if last_torque is None:
-        #  torque_penalty = 0
-        #else:
-        #  torque_penalty = sum(np.abs(last_torque - torque)) / len(torque) / 5
-        #  print("torque penalty: {:4.3f}".format(np.exp(-torque_penalty)))
-        #last_torque = torque
-
         robot_state = np.concatenate([
                 new_orient,             # pelvis orientation
                 motor_pos,
@@ -468,7 +459,6 @@ def run_udp(policy_files):
         delay = (time.monotonic() - t) * 1000
 
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
-        #phase_add = int(env.simrate * (np.interp(np.abs(speed), (1, 2), (1, 1.5))))
         print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ''), end='\r')
 
         # Track phase
