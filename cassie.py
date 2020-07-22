@@ -402,7 +402,7 @@ class CassieEnv_v2:
     clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=True)
     clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=False)
 
-    frc_speed_coef = max(pelvis_vel[0], 1)
+    frc_speed_coef = 1 #max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 400)
     right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 400)
@@ -454,10 +454,10 @@ class CassieEnv_v2:
              0.250 * np.exp(-(orientation_error + foot_err)) + \
              0.200 * np.exp(-foot_frc_err) +                   \
              0.200 * np.exp(-x_vel) +                          \
+             0.125 * np.exp(-pelvis_acc) +                     \
              0.100 * np.exp(-y_vel) +                          \
-             0.100 * np.exp(-pelvis_acc) +                     \
              0.050 * np.exp(-pelvis_hgt) +                     \
-             0.050 * np.exp(-foot_height_err) +                \
+             0.025 * np.exp(-foot_height_err) +                \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
