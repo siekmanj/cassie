@@ -97,20 +97,17 @@ def check_stdin():
 def run_udp(policy_files):
   from util.env import env_factory
 
-  policies   = [torch.load(p) for p in policy_files]
-  m_policies = [torch.load(p) for p in policy_files]
+  policy = torch.load(policy_files)
+  m_policy = torch.load(policy_files)
 
 
-  legacies = ['legacy' if not (hasattr(p, 'legacy') and p.legacy == False) else '' for p in policies]
-  envs     = [env_factory(p.env_name + legacy)() for p, legacy in zip(policies, legacies)]
+  env = env_factory(policy.env_name)()
 
-  for i, env in enumerate(envs):
-    if not env.state_est:
-      print("{} was not trained with state estimation and cannot be run on the robot.".format(policy_files[i]))
-      raise RuntimeError
+  if not env.state_est:
+    print("{} was not trained with state estimation and cannot be run on the robot.".format(policy_files[i]))
+    raise RuntimeError
   
-  for i, p in enumerate(policies):
-    print("Policy {:3d} is a: {}".format(i, p.__class__.__name__))
+  print("Policy is a: {}".format(policy.__class__.__name__))
   time.sleep(1)
 
   time_log   = [] # time stamp
@@ -119,7 +116,6 @@ def run_udp(policy_files):
   state_log  = [] # cassie state
   target_log = [] # PD target log
 
-  env = envs[0]
   clock_based = env.clock
   no_delta = True
 
@@ -143,8 +139,6 @@ def run_udp(policy_files):
       time.sleep(0.001)
       y = cassie.recv_newest_pd()
 
-  policy_idx = None
-
   print('Connected!\n')
 
   # Whether or not STO has been TOGGLED (i.e. it does not count the initial STO condition)
@@ -162,7 +156,8 @@ def run_udp(policy_files):
   speed        = 0
   side_speed   = 0
   orient_add   = 0
-  phase_add    = 75
+  phase_add    = 60
+  ratio        = 0.5
   phase        = 0
 
   D_mult       = 1
@@ -181,12 +176,10 @@ def run_udp(policy_files):
   mirror       = False
   last_torque  = None
 
-  for policy in policies:
-    if hasattr(policy, 'init_hidden_state'):
-      policy.init_hidden_state()
-  for policy in m_policies:
-    if hasattr(policy, 'init_hidden_state'):
-      policy.init_hidden_state()
+  if hasattr(policy, 'init_hidden_state'):
+    policy.init_hidden_state()
+  if hasattr(policy, 'init_hidden_state'):
+    m_policy.init_hidden_state()
 
   old_settings = termios.tcgetattr(sys.stdin)
   try:
@@ -212,9 +205,11 @@ def run_udp(policy_files):
 
           # Switch the operation mode based on the toggle next to STO
           if state.radio.channel[9] < -0.5: # towards operator means damping shutdown mode
-              operation_mode = 2
+            operation_mode = 2
+            speed = 0
           elif state.radio.channel[9] > 0.5: # away from the operator means zero hidden states
             operation_mode = 1
+            speed = 0
           else:                              # Middle means normal walking
             operation_mode = 0
 
@@ -229,8 +224,11 @@ def run_udp(policy_files):
               ESTOP = False
               logged = False
 
-          raw_spd = (state.radio.channel[0])
-          speed = raw_spd * max_speed if raw_spd > 0 else -raw_spd * min_speed
+          raw_spd = (state.radio.channel[0]) * 0.1
+          if np.abs(raw_spd) < 0.01:
+            raw_spd = 0
+          speed += raw_spd * 0.1
+
 
           raw_side_spd = -state.radio.channel[1]
           side_speed = raw_side_spd * max_y_speed if raw_side_spd > 0 else -raw_side_spd * min_y_speed
@@ -241,11 +239,8 @@ def run_udp(policy_files):
 
           cmd_foot_height = 0.03 + (state.radio.channel[7] + 1)/15
 
-          pitch_bias      = state.radio.channel[5]/6
-          policy_idx      = int(state.radio.channel[10])
-          mirror = state.radio.channel[11] > 0
-          if policy_idx == -1:
-              policy_idx = None
+          pitch_bias = state.radio.channel[5]/6
+          mirror = int(state.radio.channel[10]) > 0
 
         else:
           """ 
@@ -257,13 +252,12 @@ def run_udp(policy_files):
             c = sys.stdin.read(1)
             if c == 'w':
               speed += 0.1
-              phase_add = np.clip(phase_add, (0.6 * speed) * 60, None)
             if c == 's':
               speed -= 0.1
             if c == 'q':
-              orient_add -= 0.1
+              orient_add -= 0.01 * np.pi
             if c == 'e':
-              orient_add += 0.1
+              orient_add += 0.01 * np.pi
             if c == 'a':
               side_speed -= 0.05
             if c == 'd':
@@ -282,18 +276,18 @@ def run_udp(policy_files):
               cmd_height += 0.01
             if c == 'h':
               cmd_height -= 0.01
-            if c == 'c':
+            if c == 'u':
               cmd_foot_height += 0.01
-            if c == 'v':
+            if c == 'j':
               cmd_foot_height -= 0.01
-            if c.isdigit():
-              if int(c) > len(policies) - 1:
-                policy_idx = None
-              else:
-                policy_idx = int(c)
+            if c == 'o':
+              ratio += 0.01
+            if c == 'l':
+              ratio -= 0.01
+
             if c == 'x':
-              for policy in policies:
-                policy.init_hidden_state()
+              policy.init_hidden_state()
+              m_policy.init_hidden_state()
               ESTOP = not ESTOP
               logged = False
 
@@ -335,15 +329,15 @@ def run_udp(policy_files):
                 target_log = []
                 t0 = time.monotonic()
 
-            for policy in policies:
-              if hasattr(policy, 'init_hidden_state'):
-                policy.init_hidden_state()
+            if hasattr(policy, 'init_hidden_state'):
+              policy.init_hidden_state()
+              m_policy.init_hidden_state()
 
         #------------------------------- Normal Walking ---------------------------
         if operation_mode == 1:
-          for policy in policies:
-            if hasattr(policy, 'init_hidden_state'):
-              policy.init_hidden_state()
+          if hasattr(policy, 'init_hidden_state'):
+            policy.init_hidden_state()
+            m_policy.init_hidden_state()
 
         # Quat before bias modification
         quaternion = euler2quat(z=orient_add, y=0, x=0)
@@ -364,22 +358,11 @@ def run_udp(policy_files):
         if new_orient[0] < 0:
           new_orient = [-1 * x for x in new_orient]
 
-        if env.clock:
-          ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, cmd_foot_height]))
-        else:
-          ext_state   = np.concatenate(([speed], [side_speed], [cmd_height], [cmd_foot_height]))
+        ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, cmd_foot_height, ratio]))
 
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
         pelvis_hgt   = state.pelvis.position[2] - state.terrain.height
-
-        #torque = np.asarray(state.motor.torque[:])
-        #if last_torque is None:
-        #  torque_penalty = 0
-        #else:
-        #  torque_penalty = sum(np.abs(last_torque - torque)) / len(torque) / 5
-        #  print("torque penalty: {:4.3f}".format(np.exp(-torque_penalty)))
-        #last_torque = torque
 
         robot_state = np.concatenate([
                 new_orient,             # pelvis orientation
@@ -406,35 +389,24 @@ def run_udp(policy_files):
         mirror_RL_state = env.mirror_state(RL_state)
 
         # Construct input vector
-        torch_states         = [torch.Tensor(RL_state) for _ in policies]
-        mirror_torch_states  = [torch.Tensor(mirror_RL_state) for _ in policies]
+        torch_state         = torch.Tensor(RL_state)
+        mirror_torch_state  = torch.Tensor(mirror_RL_state)
 
-        if no_delta:
-          offset = env.offset
-        else:
-          offset = env.get_ref_state(phase=phase)[0][env.pos_idx]
+        offset = env.offset
 
-        actions        = [policy(state).numpy() for state, policy in zip(torch_states, policies)]
-        mirror_actions = [env.mirror_action(policy(state).numpy()) for state, policy in zip(mirror_torch_states, m_policies)]
+        action        = policy(torch_state).numpy()
+        mirror_action = env.mirror_action(m_policy(mirror_torch_state).numpy())
 
         if mirror:
-          env_action = [(a + m) / 2 for a, m in zip(actions, mirror_actions)]
+          env_action = (action + mirror_action) / 2
+          #env_action = mirror_action 
         else:
-          env_action = actions
+          env_action = action
 
-        targets = [action[:10] + offset for action in env_action]
+        target = env_action[:10] + offset
 
-        p_gains = [action[10:20] if len(action) > 10 else np.zeros(10) for action in env_action]
-        d_gains = [action[20:30] if len(action) > 20 else np.zeros(10) for action in env_action]
-
-        if policy_idx is None:
-          target = np.mean(targets, axis=0)
-          p_gain = np.mean(p_gains, axis=0)
-          d_gain = np.mean(d_gains, axis=0)
-        else:
-          target = targets[policy_idx]
-          p_gain = p_gains[policy_idx]
-          d_gain = d_gains[policy_idx]
+        p_gain = env_action[10:20] if len(action) > 10 else np.zeros(10)
+        d_gain = env_action[20:30] if len(action) > 20 else np.zeros(10)
 
         if ESTOP or operation_mode == 2:
           for i in range(5):
@@ -465,7 +437,10 @@ def run_udp(policy_files):
             time.sleep(0.001)
         delay = (time.monotonic() - t) * 1000
 
-        print("MODE {:10s} | IDX {} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | {:20s}".format(mode, policy_idx, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ''), end='\r')
+        phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
+        ratio     = env.bound_ratio(speed, ratio=ratio)
+        print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ratio, ''), end='\r')
+
 
         # Track phase
         phase += phase_add
