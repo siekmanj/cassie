@@ -440,7 +440,7 @@ class CassieEnv_v2:
     if self.last_torque is None:
       torque_penalty = 0
     else:
-      torque_penalty = 0.02 * sum(np.abs(torque)/len(torque))
+      torque_penalty = 0.05 * sum(np.abs(torque)/len(torque))
 
     # Action cost term
     if self.last_action is None:
@@ -448,7 +448,7 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    pelvis_acc = 0.10 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.20 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
