@@ -448,7 +448,7 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    pelvis_acc = 0.20 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.15 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
