@@ -396,11 +396,11 @@ class CassieEnv_v2:
     ######################
 
     ratio         = self.ratio
-    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.15 * ratio,     flip=False)
-    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.15 * (1-ratio), flip=True)
+    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=1.0 * ratio,     flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=1.0 * (1-ratio), flip=True)
 
-    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.15 * ratio,     flip=True)
-    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.15 * (1-ratio), flip=False)
+    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=1.0 * ratio,     flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=1.0 * (1-ratio), flip=False)
 
     frc_speed_coef = 1 #max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
@@ -479,18 +479,19 @@ class CassieEnv_v2:
         return  [np.sin(2 * np.pi *  self.phase / self.phase_len),
                  np.cos(2 * np.pi *  self.phase / self.phase_len)]
 
-  def reward_clock(self, ratio=0.5, saturation=0.05, flip=False):
+  def reward_clock(self, ratio=0.5, saturation=0.5, flip=False):
     minval = 0
     x = self.phase / self.phase_len
     if flip:
       x = np.fmod(x + 0.5, 1)
 
-    slope = 1 / ((ratio / 2) - saturation)
+    alpha = saturation * (ratio / 2 - 1e-3)
+    slope = 1 / ((ratio / 2) - alpha)
 
-    if x < saturation + ratio/2:
-      return np.clip((-slope * (x - saturation) + 1),    minval, 1)
-    elif x > 1 - (saturation + ratio/2):
-      return np.clip((slope * (x - 1 + saturation) + 1), minval, 1)
+    if x < alpha + ratio/2:
+      return np.clip((-slope * (x - alpha) + 1),    minval, 1)
+    elif x > 1 - (alpha + ratio/2):
+      return np.clip((slope * (x - 1 + alpha) + 1), minval, 1)
     else:
       return minval
 
