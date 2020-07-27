@@ -396,11 +396,11 @@ class CassieEnv_v2:
     ######################
 
     ratio         = self.ratio
-    clock1_swing  = self.reward_clock(ratio=ratio,   alpha=1.0 * ratio,     flip=False)
-    clock1_stance = self.reward_clock(ratio=1-ratio, alpha=1.0 * (1-ratio), flip=True)
+    clock1_swing  = self.reward_clock(ratio=ratio,   alpha=0.6 * ratio,     flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, alpha=0.6 * (1-ratio), flip=True)
 
-    clock2_swing  = self.reward_clock(ratio=ratio,   alpha=1.0 * ratio,     flip=True)
-    clock2_stance = self.reward_clock(ratio=1-ratio, alpha=1.0 * (1-ratio), flip=False)
+    clock2_swing  = self.reward_clock(ratio=ratio,   alpha=0.6 * ratio,     flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, alpha=0.6 * (1-ratio), flip=False)
 
     frc_speed_coef = 1 #max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
