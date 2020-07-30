@@ -176,6 +176,8 @@ def run_udp(policy_files):
   mirror       = False
   last_torque  = None
 
+  old_state = env.observation_space
+
   if hasattr(policy, 'init_hidden_state'):
     policy.init_hidden_state()
   if hasattr(policy, 'init_hidden_state'):
@@ -228,7 +230,6 @@ def run_udp(policy_files):
           if np.abs(raw_spd) < 0.01:
             raw_spd = 0
           speed += raw_spd * 0.1
-
 
           raw_side_spd = -state.radio.channel[1]
           side_speed = raw_side_spd * max_y_speed if raw_side_spd > 0 else -raw_side_spd * min_y_speed
@@ -386,6 +387,13 @@ def run_udp(policy_files):
 
         actual_speed    = 0.9 * actual_speed + 0.1 * pelvis_vel[0]
         RL_state        = np.concatenate([robot_state, ext_state])
+
+        old_state = 0.95 * old_state + 0.05 * RL_state
+        for x in old_state:
+          print("{:5.2f}".format(x), end=', ')
+        print()
+
+        
         mirror_RL_state = env.mirror_state(RL_state)
 
         # Construct input vector
@@ -439,7 +447,7 @@ def run_udp(policy_files):
 
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
         ratio     = env.bound_ratio(speed, ratio=ratio)
-        print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ratio, ''), end='\r')
+        #print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ratio, ''), end='\r')
 
 
         # Track phase
