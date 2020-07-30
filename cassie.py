@@ -192,10 +192,10 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded foot height
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
-    if np.random.randint(100) == 0: # random changes to speed
-      #self.speed = np.random.uniform(self.min_speed, self.max_speed)
-      self.speed += np.random.uniform(-0.1, 0.5)
-      self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
+    if np.random.randint(300) == 0: # random changes to speed
+      self.speed = np.random.uniform(self.min_speed, self.max_speed)
+      #self.speed += np.random.uniform(-0.1, 0.5)
+      #self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
       self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
       self.ratio     = self.bound_ratio(self.speed, ratio=self.ratio)
 
@@ -332,7 +332,7 @@ class CassieEnv_v2:
       self.cassie_state = self.sim.step_pd(self.u)
 
       self.orient_add  = 0
-      self.speed       = np.random.uniform(self.min_speed, self.max_speed)
+      self.speed       = np.random.uniform(-0.5, 1.0)
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
@@ -400,11 +400,11 @@ class CassieEnv_v2:
     ######################
 
     ratio         = self.ratio
-    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.2 * ratio,     flip=False)
-    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.2 * (1-ratio), flip=True)
+    clock1_swing  = self.reward_clock(ratio=ratio,   alpha=0.15 * ratio,     flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, alpha=0.15 * (1-ratio), flip=True)
 
-    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.2 * ratio,     flip=True)
-    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.2 * (1-ratio), flip=False)
+    clock2_swing  = self.reward_clock(ratio=ratio,   alpha=0.15 * ratio,     flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, alpha=0.15 * (1-ratio), flip=False)
 
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / 100
@@ -477,7 +477,7 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    pelvis_acc = 0.20 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.15 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
@@ -508,20 +508,27 @@ class CassieEnv_v2:
         return  [np.sin(2 * np.pi *  self.phase / self.phase_len),
                  np.cos(2 * np.pi *  self.phase / self.phase_len)]
 
-  def reward_clock(self, ratio=0.5, saturation=0.05, flip=False):
-    minval = 0
-    x = self.phase / self.phase_len
+  def reward_clock(self, ratio=0.5, alpha=0.5, flip=False):
+    phi = self.phase / self.phase_len
+    beta = 0.0
     if flip:
-      x = np.fmod(x + 0.5, 1)
+      beta = 0.5
+    phi = np.fmod(phi + beta, 1)
 
+    saturation = alpha * (ratio / 2 - 1e-3)
     slope = 1 / ((ratio / 2) - saturation)
 
-    if x < saturation + ratio/2:
-      return np.clip((-slope * (x - saturation) + 1),    minval, 1)
-    elif x > 1 - (saturation + ratio/2):
-      return np.clip((slope * (x - 1 + saturation) + 1), minval, 1)
+    if phi < saturation:
+      return 1.0
+    elif phi < ratio/2:
+      return 1 - slope * (phi - saturation)
+    elif phi < 1 - ratio/2:
+      return 0.0
+    elif phi < 1 - saturation:
+      return 1 + slope * (phi + saturation - 1)
     else:
-      return minval
+      return 1.0
+
 
   def bound_freq(self, speed, freq=None, generate_new=False):
     lower = np.interp(np.abs(speed), (0, 3), (0.9, 1.5))
