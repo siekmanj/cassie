@@ -342,6 +342,10 @@ class CassieEnv_v2:
       self.last_action = None
       self.last_torque = None
       self.last_pelvis_rot = None
+      self.last_left_pos  = self.cassie_state.leftFoot.position[:]
+      self.last_right_pos = self.cassie_state.rightFoot.position[:]
+
+      self.last_t = self.sim.time()
 
       return self.get_full_state()
 
@@ -396,19 +400,41 @@ class CassieEnv_v2:
     ######################
 
     ratio         = self.ratio
-    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=False)
-    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=True)
+    clock1_swing  = self.reward_clock(ratio=ratio,   saturation=0.2 * ratio,     flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, saturation=0.2 * (1-ratio), flip=True)
 
-    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.08 * ratio,     flip=True)
-    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.08 * (1-ratio), flip=False)
+    clock2_swing  = self.reward_clock(ratio=ratio,   saturation=0.2 * ratio,     flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, saturation=0.2 * (1-ratio), flip=False)
 
-    frc_speed_coef = 1 #max(pelvis_vel[0], 1)
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / (frc_speed_coef * 400)
-    right_frc      = np.abs(foot_frc[6:9]).sum() / (frc_speed_coef * 400)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / 100
+    right_frc      = np.abs(foot_frc[6:9]).sum() / 100
 
-    left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
-    right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
+    #pelvis_speed = np.sqrt(np.power(pelvis_vel, 2).sum())
+
+    left_vel  = np.sqrt(np.power(self.cassie_state.leftFoot.footTranslationalVelocity, 2).sum())
+    right_vel = np.sqrt(np.power(self.cassie_state.rightFoot.footTranslationalVelocity, 2).sum())
+
+    #print("PELVIS VEL {:5.2}".format(pelvis_speed), end=', ')
+    #if clock1_swing > 0:
+    #  print("PUNISHING LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
+    #else:
+    #  print("IGNORING  LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
+
+    #if clock2_swing > 0:
+    #  print("PUNISHING RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
+    #else:
+    #  print("IGNORING  RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
+
+    #if clock1_stance > 0:
+    #  print("PUNISHING LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
+    #else:
+    #  print("IGNORING  LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
+
+    #if clock2_stance > 0:
+    #  print("PUNISHING RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
+    #else:
+    #  print("IGNORING  RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
 
     # Penalty which multiplies foot forces by 1 during swing, and 0 during stance.
     # (punish foot forces in the air)
@@ -419,6 +445,9 @@ class CassieEnv_v2:
     # (punish foot velocities when foot is on the ground)
     left_vel_penalty  = np.abs(clock1_stance * left_vel)
     right_vel_penalty = np.abs(clock2_stance * right_vel)
+
+    #print("FRC PENALTY: {:6.3f}".format(np.exp(-(left_frc_penalty + right_frc_penalty))))
+    #input()
 
     left_penalty  = left_frc_penalty + left_vel_penalty
     right_penalty = right_frc_penalty + right_vel_penalty
@@ -480,7 +509,7 @@ class CassieEnv_v2:
                  np.cos(2 * np.pi *  self.phase / self.phase_len)]
 
   def reward_clock(self, ratio=0.5, saturation=0.05, flip=False):
-    minval = 1e-2
+    minval = 0
     x = self.phase / self.phase_len
     if flip:
       x = np.fmod(x + 0.5, 1)
