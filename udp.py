@@ -178,7 +178,7 @@ def run_udp(policy_files):
   delay_target = 1
   logged       = True
   mirror       = False
-  last_torque  = None
+  torques      = 0
 
   old_state = env.observation_space
 
@@ -395,11 +395,6 @@ def run_udp(policy_files):
 
         actual_speed    = 0.9 * actual_speed + 0.1 * pelvis_vel[0]
         RL_state        = np.concatenate([robot_state, ext_state])
-
-        #old_state = 0.95 * old_state + 0.05 * RL_state
-        #for x in old_state:
-        #  print("{:5.2f}".format(x), end=', ')
-        #print()
         
         mirror_RL_state = env.mirror_state(RL_state)
 
@@ -447,9 +442,10 @@ def run_udp(policy_files):
           target_log.append(target)
         cassie.send_pd(u)
         
+        torques   = torques * 0.95 + 0.05 * np.abs(state.motor.torque[:]).sum()
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
         ratio     = env.bound_ratio(speed, ratio=ratio)
-        print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:5.2f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} (target {:6.3f}) | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, delay_target * (env.simrate / 2000), cmd_height, cmd_foot_height, ratio, ''), end='\r')
+        print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:5.2f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} (target {:6.3f}) | Torques {:7.2f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, delay_target * (env.simrate / 2000), torques, cmd_height, cmd_foot_height, ratio, ''), end='\r')
 
 
         # Track phase
