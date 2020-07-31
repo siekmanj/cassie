@@ -27,7 +27,7 @@ class CassieEnv_v2:
     self.dynamics_randomization = dynamics_randomization
     self.state_est              = True
 
-    state_est_size = 16
+    state_est_size = 13
     clock_size     = 2 # [sin(t), cos(t)]
     speed_size     = 2 # [x speed, y speed]
     height_size    = 2 # [pelvis height, foot apex height]
@@ -102,7 +102,6 @@ class CassieEnv_v2:
     self.side_speed  = 0
     self.orient_add  = 0
     self.height      = 1.0
-    self.foot_height = 0.05
 
     self.min_swing_ratio = 0.40
     self.max_swing_ratio = 0.8
@@ -189,8 +188,8 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded height
       self.height = np.random.uniform(self.min_height, self.max_height)
 
-    if np.random.randint(300) == 0: # random changes to commanded foot height
-      self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
+    #if np.random.randint(300) == 0: # random changes to commanded foot height
+    #  self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
     if np.random.randint(300) == 0: # random changes to speed
       self.speed = np.random.uniform(self.min_speed, self.max_speed)
@@ -340,7 +339,7 @@ class CassieEnv_v2:
       self.speed       = np.random.uniform(-0.5, 1.0)
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
-      self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
+      #self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
       self.phase_add   = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
       self.ratio       = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
 
@@ -462,8 +461,8 @@ class CassieEnv_v2:
     lhgt = sim_height + self.cassie_state.leftFoot.position[:][2]
     rhgt = sim_height + self.cassie_state.rightFoot.position[:][2]
 
-    foot_height_err = 6 * (clock1_swing * np.abs(lhgt - self.foot_height) + \
-                           clock2_swing * np.abs(rhgt - self.foot_height))
+    #foot_height_err = 6 * (clock1_swing * np.abs(lhgt - self.foot_height) + \
+    #                       clock2_swing * np.abs(rhgt - self.foot_height))
 
     ########################
     # JERKINESS COST TERMS #
@@ -490,8 +489,7 @@ class CassieEnv_v2:
              0.200 * np.exp(-x_vel) +                          \
              0.125 * np.exp(-pelvis_acc) +                     \
              0.100 * np.exp(-y_vel) +                          \
-             0.050 * np.exp(-pelvis_hgt) +                     \
-             0.025 * np.exp(-foot_height_err) +                \
+             0.075 * np.exp(-pelvis_hgt) +                     \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
@@ -564,11 +562,11 @@ class CassieEnv_v2:
 
       clock = self.get_clock()
       
-      ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height, self.foot_height, self.ratio]))
+      ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height, self.ratio]))
 
       pelvis_quat = self.rotate_to_orient(self.cassie_state.pelvis.orientation)
 
-      pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
+      #pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
       pelvis_rvel = self.cassie_state.pelvis.rotationalVelocity[:]
 
       #if self.dynamics_randomization:
@@ -590,7 +588,7 @@ class CassieEnv_v2:
 
       robot_state = np.concatenate([
           pelvis_quat[:],  # pelvis orientation
-          pelvis_vel,      # pelvis translational velocity
+          #pelvis_vel,      # pelvis translational velocity
           pelvis_rvel,     # pelvis rotational velocity 
           left_pos,
           right_pos
@@ -616,9 +614,9 @@ class CassieEnv_v2:
   def mirror_state(self, state):
     state_est_indices = [0.01, 1, 2, 3, # pelvis orientation
                           4, -5,  6,    # translational vel
-                         -7,  8, -9,    # rotational vel
-                         13, -14, 15,   # right foot pos
-                         10, -11, 12,]  # left foot pos
+                         -4,  5, -6,    # rotational vel
+                         10, -11, 12,   # right foot pos
+                         7, -8, 9,]  # left foot pos
                         
     #state_est_indices = [0.01, 1, 2, 3,            # pelvis orientation
     #                     -9, -10, 11, 12, 13,      # left motor pos
