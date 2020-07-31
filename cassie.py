@@ -81,8 +81,8 @@ class CassieEnv_v2:
     self.max_height = 1.00
     self.min_height = 0.8
 
-    self.max_foot_height = 0.13
-    self.min_foot_height = 0.03
+    #self.max_foot_height = 0.13
+    #self.min_foot_height = 0.03
 
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
@@ -102,7 +102,7 @@ class CassieEnv_v2:
     self.side_speed  = 0
     self.orient_add  = 0
     self.height      = 1.0
-    self.foot_height = 0.05
+    #self.foot_height = 0.05
 
     self.min_swing_ratio = 0.40
     self.max_swing_ratio = 0.8
@@ -189,8 +189,8 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded height
       self.height = np.random.uniform(self.min_height, self.max_height)
 
-    if np.random.randint(300) == 0: # random changes to commanded foot height
-      self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
+    #if np.random.randint(300) == 0: # random changes to commanded foot height
+    #  self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
     if np.random.randint(300) == 0: # random changes to speed
       #self.speed = np.random.uniform(self.min_speed, self.max_speed)
@@ -335,7 +335,7 @@ class CassieEnv_v2:
       self.speed       = np.random.uniform(-0.5, 1.0)
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
-      self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
+      #self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
       self.phase_add   = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
       self.ratio       = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
 
@@ -457,8 +457,8 @@ class CassieEnv_v2:
     lhgt = sim_height + self.cassie_state.leftFoot.position[:][2]
     rhgt = sim_height + self.cassie_state.rightFoot.position[:][2]
 
-    foot_height_err = 6 * (clock1_swing * np.abs(lhgt - self.foot_height) + \
-                           clock2_swing * np.abs(rhgt - self.foot_height))
+    #foot_height_err = 6 * (clock1_swing * np.abs(lhgt - self.foot_height) + \
+    #                       clock2_swing * np.abs(rhgt - self.foot_height))
 
     ########################
     # JERKINESS COST TERMS #
@@ -485,8 +485,7 @@ class CassieEnv_v2:
              0.200 * np.exp(-x_vel) +                          \
              0.125 * np.exp(-pelvis_acc) +                     \
              0.100 * np.exp(-y_vel) +                          \
-             0.050 * np.exp(-pelvis_hgt) +                     \
-             0.025 * np.exp(-foot_height_err) +                \
+             0.075 * np.exp(-pelvis_hgt) +                     \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
@@ -559,7 +558,7 @@ class CassieEnv_v2:
 
       clock = self.get_clock()
       
-      ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height, self.foot_height, self.ratio]))
+      ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height, self.ratio]))
 
       pelvis_quat = self.rotate_to_orient(self.cassie_state.pelvis.orientation)
 
@@ -632,11 +631,11 @@ class CassieEnv_v2:
     else:
       raise NotImplementedError
 
-    if statedim == 45: # state estimator with clock and speed or height
-      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(7)]
-      sidespeed  = mirror_obs[-4]
-      sinclock   = mirror_obs[-6]
-      cosclock   = mirror_obs[-7]
+    if statedim == 44: # state estimator with clock and speed or height
+      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(6)]
+      sidespeed  = mirror_obs[-3]
+      sinclock   = mirror_obs[-5]
+      cosclock   = mirror_obs[-6]
       
       new_orient       = state[:,:4]
       new_orient       = np.array(list(map(inverse_quaternion, [new_orient[i] for i in range(batchdim)])))
