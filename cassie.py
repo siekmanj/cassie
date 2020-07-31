@@ -92,8 +92,11 @@ class CassieEnv_v2:
     self.damping_low = 0.3
     self.damping_high = 5.0
 
+    self.max_simrate = 70
+    self.min_simrate = 50
+
     self.mass_low = 0.5
-    self.mass_high = 1.5
+    self.mass_high = 1.75
 
     self.fric_low = 0.4
     self.fric_high = 1.1
@@ -114,6 +117,7 @@ class CassieEnv_v2:
     self.default_fric = self.sim.get_geom_friction()
     self.default_rgba = self.sim.get_geom_rgba()
     self.default_quat = self.sim.get_geom_quat()
+    self.default_simrate = simrate
 
     self.motor_encoder_noise = np.zeros(10)
     self.joint_encoder_noise = np.zeros(6)
@@ -159,7 +163,7 @@ class CassieEnv_v2:
 
   def step(self, action):
 
-    delay_rand = 7
+    delay_rand = 4
     if self.dynamics_randomization:
       simrate = self.simrate + np.random.randint(-delay_rand, delay_rand+1)
     else:
@@ -204,12 +208,15 @@ class CassieEnv_v2:
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
     if np.random.randint(300) == 0: # random changes to clock speed
-      self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
+      self.phase_add = int(self.default_simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
 
       #self.phase_add = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
 
     if np.random.randint(300) == 0: # random changes to swing ratio
       self.ratio = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
+
+    if np.random.randint(300) == 0 and self.dynamics_randomization:
+      self.simrate = int(np.random.uniform(self.min_simrate, self.max_simrate))
 
       #self.ratio = self.bound_ratio(self.speed)
 
@@ -322,12 +329,14 @@ class CassieEnv_v2:
           self.sim.set_body_ipos(com_noise)
           self.sim.set_geom_friction(np.clip(fric_noise, 0, None))
           self.sim.set_geom_quat(geom_quat)
+          self.simrate = int(np.random.uniform(self.min_simrate, self.max_simrate))
       else:
           self.sim.set_body_mass(self.default_mass)
           self.sim.set_body_ipos(self.default_ipos)
           self.sim.set_dof_damping(self.default_damping)
           self.sim.set_geom_friction(self.default_fric)
           self.sim.set_geom_quat(self.default_quat)
+          self.simrate = int(self.default_simrate)
 
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
@@ -341,7 +350,8 @@ class CassieEnv_v2:
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
-      self.phase_add   = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
+      #self.phase_add   = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
+      self.phase_add   = int(self.default_simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
       self.ratio       = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
 
       self.last_action = None
@@ -542,7 +552,7 @@ class CassieEnv_v2:
     if generate_new:
       freq = np.random.uniform(lower, upper)
     elif freq is None:
-      freq = self.phase_add / self.simrate
+      freq = self.phase_add / self.default_simrate
     freq = np.clip(freq, lower, upper)
 
     return freq
