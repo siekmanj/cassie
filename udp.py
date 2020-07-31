@@ -388,11 +388,10 @@ def run_udp(policy_files):
         actual_speed    = 0.9 * actual_speed + 0.1 * pelvis_vel[0]
         RL_state        = np.concatenate([robot_state, ext_state])
 
-        old_state = 0.95 * old_state + 0.05 * RL_state
-        for x in old_state:
-          print("{:5.2f}".format(x), end=', ')
-        print()
-
+        #old_state = 0.95 * old_state + 0.05 * RL_state
+        #for x in old_state:
+        #  print("{:5.2f}".format(x), end=', ')
+        #print()
         
         mirror_RL_state = env.mirror_state(RL_state)
 
@@ -407,7 +406,6 @@ def run_udp(policy_files):
 
         if mirror:
           env_action = (action + mirror_action) / 2
-          #env_action = mirror_action 
         else:
           env_action = action
 
@@ -447,7 +445,7 @@ def run_udp(policy_files):
 
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
         ratio     = env.bound_ratio(speed, ratio=ratio)
-        #print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ratio, ''), end='\r')
+        print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ratio, ''), end='\r')
 
 
         # Track phase
@@ -509,7 +507,7 @@ def logvis(filename):
         sim.set_qpos(qpos)
         sim.set_qvel(np.zeros(sim.nv))
         sim.step_pd(pd_in_t())
-        sim.foot_pos(curr_foot)
+        #sim.foot_pos(curr_foot)
         
         render_state = vis.draw(sim)
         time.sleep(0.0303)
