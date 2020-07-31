@@ -97,6 +97,9 @@ def check_stdin():
 def run_udp(policy_files):
   from util.env import env_factory
 
+  if type(policy_files) is list:
+    policy_files = policy_files[0]
+
   policy = torch.load(policy_files)
   m_policy = torch.load(policy_files)
 
@@ -164,7 +167,7 @@ def run_udp(policy_files):
   actual_speed = 0
   delay        = 30
   counter      = 0
-  pitch_bias   = 0
+  #pitch_bias   = 0
   ESTOP_count  = 0
   max_speed    =  2.00
   min_speed    = -0.30
@@ -172,6 +175,7 @@ def run_udp(policy_files):
   min_y_speed  = -0.25
   cmd_height   = 0.9
   cmd_foot_height = 0.05
+  delay_target = 1
   logged       = True
   mirror       = False
   last_torque  = None
@@ -240,7 +244,8 @@ def run_udp(policy_files):
 
           cmd_foot_height = 0.03 + (state.radio.channel[7] + 1)/15
 
-          pitch_bias = state.radio.channel[5]/6
+          #pitch_bias = state.radio.channel[5]/6
+          delay_target = 1 + state.radio.channel[5]/4
           mirror = int(state.radio.channel[10]) > 0
 
         else:
@@ -285,7 +290,10 @@ def run_udp(policy_files):
               ratio += 0.01
             if c == 'l':
               ratio -= 0.01
-
+            if c == 'p':
+              delay_target += 0.05
+            if c == ';':
+              delay_target -= 0.05
             if c == 'x':
               policy.init_hidden_state()
               m_policy.init_hidden_state()
@@ -439,13 +447,9 @@ def run_udp(policy_files):
           target_log.append(target)
         cassie.send_pd(u)
         
-        while time.monotonic() - t < 0.03:
-            time.sleep(0.001)
-        delay = (time.monotonic() - t) * 1000
-
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
         ratio     = env.bound_ratio(speed, ratio=ratio)
-        print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:4.1f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, cmd_height, cmd_foot_height, ratio, ''), end='\r')
+        print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:5.2f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} (target {:6.3f}) | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, delay_target * (env.simrate / 2000), cmd_height, cmd_foot_height, ratio, ''), end='\r')
 
 
         # Track phase
@@ -453,6 +457,15 @@ def run_udp(policy_files):
         if phase >= env.phase_len:
           phase = phase % env.phase_len - 1
           counter += 1
+
+        delay_target = 1
+        while (time.monotonic() - t) * delay_target < env.simrate / 2000:
+            time.sleep(5e-3)
+        delay = (time.monotonic() - t) * 1000
+
+        if delay - 5 > delay_target * 1000 * env.simrate / 2000:
+          print("\nWARNING: DELAY HIGH {:6.3f} vs {:6.3f} , {}".format(delay, 1000 * env.simrate / 2000, delay > 1000 * env.simrate / 2000))
+
   finally:
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
