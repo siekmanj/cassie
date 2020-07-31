@@ -30,7 +30,7 @@ class CassieEnv_v2:
     state_est_size = 13
     clock_size     = 2 # [sin(t), cos(t)]
     speed_size     = 2 # [x speed, y speed]
-    height_size    = 2 # [pelvis height, foot apex height]
+    height_size    = 1 # [pelvis height]
     ratio_size     = 1 # [ratio]
 
     obs_size = state_est_size + speed_size + height_size + clock_size + ratio_size
