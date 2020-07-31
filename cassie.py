@@ -27,7 +27,7 @@ class CassieEnv_v2:
     self.dynamics_randomization = dynamics_randomization
     self.state_est              = True
 
-    state_est_size = 38
+    state_est_size = 16
     clock_size     = 2 # [sin(t), cos(t)]
     speed_size     = 2 # [x speed, y speed]
     height_size    = 2 # [pelvis height, foot apex height]
@@ -69,7 +69,7 @@ class CassieEnv_v2:
 
     self.max_orient_change = 0.2
 
-    self.max_speed = 4.0
+    self.max_speed = 3
     self.min_speed = -0.5
 
     self.max_side_speed  = 0.3
@@ -412,8 +412,8 @@ class CassieEnv_v2:
     clock2_stance = self.reward_clock(ratio=1-ratio, alpha=0.15 * (1-ratio), flip=False)
 
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / 100
-    right_frc      = np.abs(foot_frc[6:9]).sum() / 100
+    left_frc       = np.abs(foot_frc[0:3]).sum() / 200
+    right_frc      = np.abs(foot_frc[6:9]).sum() / 200
 
     #pelvis_speed = np.sqrt(np.power(pelvis_vel, 2).sum())
 
@@ -571,28 +571,33 @@ class CassieEnv_v2:
       pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
       pelvis_rvel = self.cassie_state.pelvis.rotationalVelocity[:]
 
-      if self.dynamics_randomization:
-        motor_pos = self.cassie_state.motor.position[:] + self.motor_encoder_noise
-        joint_pos = self.cassie_state.joint.position[:] + self.joint_encoder_noise
-      else:
-        motor_pos = self.cassie_state.motor.position[:]
-        joint_pos = self.cassie_state.joint.position[:]
+      #if self.dynamics_randomization:
+      #  motor_pos = self.cassie_state.motor.position[:] + self.motor_encoder_noise
+      #  joint_pos = self.cassie_state.joint.position[:] + self.joint_encoder_noise
+      #else:
+      #  motor_pos = self.cassie_state.motor.position[:]
+      #  joint_pos = self.cassie_state.joint.position[:]
 
-      motor_vel = self.cassie_state.motor.velocity[:]
-      joint_vel = self.cassie_state.joint.velocity[:]
+      #motor_vel = self.cassie_state.motor.velocity[:]
+      #joint_vel = self.cassie_state.joint.velocity[:]
 
-      # remove double-counted joint/motor positions
-      joint_pos = np.concatenate([joint_pos[:2], joint_pos[3:5]])
-      joint_vel = np.concatenate([joint_vel[:2], joint_vel[3:5]])
+      ## remove double-counted joint/motor positions
+      #joint_pos = np.concatenate([joint_pos[:2], joint_pos[3:5]])
+      #joint_vel = np.concatenate([joint_vel[:2], joint_vel[3:5]])
+
+      left_pos  = self.cassie_state.leftFoot.position[:]
+      right_pos = self.cassie_state.rightFoot.position[:]
 
       robot_state = np.concatenate([
           pelvis_quat[:],  # pelvis orientation
-          motor_pos,       # actuated joint positions
           pelvis_vel,      # pelvis translational velocity
           pelvis_rvel,     # pelvis rotational velocity 
-          motor_vel,       # actuated joint velocities
-          joint_pos,       # unactuated joint positions
-          joint_vel        # unactuated joint velocities
+          left_pos,
+          right_pos
+          #motor_pos,      # actuated joint positions
+          #motor_vel,      # actuated joint velocities
+          #joint_pos,      # unactuated joint positions
+          #joint_vel       # unactuated joint velocities
       ])
 
       state = np.concatenate([robot_state, ext_state])
@@ -609,15 +614,21 @@ class CassieEnv_v2:
       return self.vis.draw(self.sim)
 
   def mirror_state(self, state):
-    state_est_indices = [0.01, 1, 2, 3,            # pelvis orientation
-                         -9, -10, 11, 12, 13,      # left motor pos
-                         -4,  -5,  6,  7,  8,      # right motor pos
-                         14, -15, 16,              # translational vel
-                         -17, 18, -19,             # rotational vel
-                         -25, -26, 27, 28, 29,     # left motor vel
-                         -20, -21, 22, 23, 24,     # right motor vel 
-                         32, 33, 30, 31,           # joint pos
-                         36, 37, 34, 35, ]         # joint vel
+    state_est_indices = [0.01, 1, 2, 3, # pelvis orientation
+                          4, -5,  6,    # translational vel
+                         -7,  8, -9,    # rotational vel
+                         13, -14, 15,   # right foot pos
+                         10, -11, 12,]  # left foot pos
+                        
+    #state_est_indices = [0.01, 1, 2, 3,            # pelvis orientation
+    #                     -9, -10, 11, 12, 13,      # left motor pos
+    #                     -4,  -5,  6,  7,  8,      # right motor pos
+    #                     14, -15, 16,              # translational vel
+    #                     -17, 18, -19,             # rotational vel
+    #                     -25, -26, 27, 28, 29,     # left motor vel
+    #                     -20, -21, 22, 23, 24,     # right motor vel 
+    #                     32, 33, 30, 31,           # joint pos
+    #                     36, 37, 34, 35, ]         # joint vel
 
     return_as_1d = False
     if isinstance(state, list):
@@ -637,7 +648,7 @@ class CassieEnv_v2:
     else:
       raise NotImplementedError
 
-    if statedim == 45: # state estimator with clock and speed or height
+    if statedim == 23: # state estimator with clock and speed or height
       mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(7)]
       sidespeed  = mirror_obs[-4]
       sinclock   = mirror_obs[-6]
