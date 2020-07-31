@@ -193,20 +193,25 @@ class CassieEnv_v2:
       self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
 
     if np.random.randint(300) == 0: # random changes to speed
-      #self.speed = np.random.uniform(self.min_speed, self.max_speed)
-      self.speed += np.random.uniform(-0.1, 0.5)
-      self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
-      self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
-      self.ratio     = self.bound_ratio(self.speed, ratio=self.ratio)
+      self.speed = np.random.uniform(self.min_speed, self.max_speed)
+
+      #self.speed += np.random.uniform(-0.1, 0.5)
+      #self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
+      #self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
+      #self.ratio     = self.bound_ratio(self.speed, ratio=self.ratio)
 
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
     if np.random.randint(300) == 0: # random changes to clock speed
-      self.phase_add = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
+      self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
+
+      #self.phase_add = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
 
     if np.random.randint(300) == 0: # random changes to swing ratio
-      self.ratio = self.bound_ratio(self.speed)
+      self.ratio = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
+
+      #self.ratio = self.bound_ratio(self.speed)
 
     state = self.get_full_state() 
 
