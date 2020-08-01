@@ -359,7 +359,7 @@ def run_udp(policy_files):
         if new_orient[0] < 0:
           new_orient = [-1 * x for x in new_orient]
 
-        ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, cmd_foot_height, ratio]))
+        ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, ratio]))
 
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
@@ -367,12 +367,9 @@ def run_udp(policy_files):
 
         robot_state = np.concatenate([
                 new_orient,             # pelvis orientation
-                motor_pos,
-                pelvis_vel,             # pelvis translational velocity
                 pelvis_rvel,
-                motor_vel,              # actuated joint velocities
-                joint_pos,
-                joint_vel               # unactuated joint velocities
+                state.leftFoot.position[:],
+                state.rightFoot.position[:]
         ])
           
         if operation_mode == 2 or ESTOP:

@@ -613,7 +613,6 @@ class CassieEnv_v2:
 
   def mirror_state(self, state):
     state_est_indices = [0.01, 1, 2, 3, # pelvis orientation
-                          4, -5,  6,    # translational vel
                          -4,  5, -6,    # rotational vel
                          10, -11, 12,   # right foot pos
                          7, -8, 9,]  # left foot pos
@@ -646,11 +645,11 @@ class CassieEnv_v2:
     else:
       raise NotImplementedError
 
-    if statedim == 23: # state estimator with clock and speed or height
-      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(7)]
-      sidespeed  = mirror_obs[-4]
-      sinclock   = mirror_obs[-6]
-      cosclock   = mirror_obs[-7]
+    if statedim == 19: # state estimator with clock and speed or height
+      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(6)]
+      sidespeed  = mirror_obs[-3]
+      sinclock   = mirror_obs[-5]
+      cosclock   = mirror_obs[-6]
       
       new_orient       = state[:,:4]
       new_orient       = np.array(list(map(inverse_quaternion, [new_orient[i] for i in range(batchdim)])))
