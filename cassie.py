@@ -501,7 +501,6 @@ class CassieEnv_v2:
              0.125 * np.exp(-pelvis_acc) +                     \
              0.100 * np.exp(-y_vel) +                          \
              0.075 * np.exp(-pelvis_hgt) +                     \
-             #0.025 * np.exp(-foot_height_err) +                \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
