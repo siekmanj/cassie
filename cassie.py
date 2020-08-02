@@ -87,7 +87,7 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.03
     self.max_roll_incline = 0.03
 
-    self.encoder_noise = 0.01
+    self.encoder_noise = 0.05
 
     self.damping_low = 0.3
     self.damping_high = 5.0
@@ -597,9 +597,8 @@ class CassieEnv_v2:
 
       robot_state = np.concatenate([
           pelvis_quat[:],  # pelvis orientation
-          motor_pos,       # actuated joint positions
-          pelvis_vel,      # pelvis translational velocity
           pelvis_rvel,     # pelvis rotational velocity 
+          motor_pos,       # actuated joint positions
           motor_vel,       # actuated joint velocities
           joint_pos,       # unactuated joint positions
           joint_vel        # unactuated joint velocities
