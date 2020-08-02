@@ -27,7 +27,7 @@ class CassieEnv_v2:
     self.dynamics_randomization = dynamics_randomization
     self.state_est              = True
 
-    state_est_size = 38
+    state_est_size = 35
     clock_size     = 2 # [sin(t), cos(t)]
     speed_size     = 2 # [x speed, y speed]
     height_size    = 1 # [pelvis height, foot apex height]
