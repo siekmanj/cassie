@@ -97,6 +97,9 @@ def check_stdin():
 def run_udp(policy_files):
   from util.env import env_factory
 
+  if type(policy_files) is list:
+      policy_files = policy_files[0]
+
   policy = torch.load(policy_files)
   m_policy = torch.load(policy_files)
 
