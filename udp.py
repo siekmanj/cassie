@@ -367,7 +367,7 @@ def run_udp(policy_files):
         if new_orient[0] < 0:
           new_orient = [-1 * x for x in new_orient]
 
-        ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, cmd_foot_height, ratio]))
+        ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, ratio]))
 
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
@@ -375,9 +375,8 @@ def run_udp(policy_files):
 
         robot_state = np.concatenate([
                 new_orient,             # pelvis orientation
-                motor_pos,
-                pelvis_vel,             # pelvis translational velocity
                 pelvis_rvel,
+                motor_pos,
                 motor_vel,              # actuated joint velocities
                 joint_pos,
                 joint_vel               # unactuated joint velocities
@@ -396,16 +395,20 @@ def run_udp(policy_files):
         actual_speed    = 0.9 * actual_speed + 0.1 * pelvis_vel[0]
         RL_state        = np.concatenate([robot_state, ext_state])
         
-        mirror_RL_state = env.mirror_state(RL_state)
+        if mirror:
+          mirror_RL_state = env.mirror_state(RL_state)
 
         # Construct input vector
         torch_state         = torch.Tensor(RL_state)
-        mirror_torch_state  = torch.Tensor(mirror_RL_state)
+
+        if mirror:
+          mirror_torch_state  = torch.Tensor(mirror_RL_state)
 
         offset = env.offset
 
         action        = policy(torch_state).numpy()
-        mirror_action = env.mirror_action(m_policy(mirror_torch_state).numpy())
+        if mirror:
+          mirror_action = env.mirror_action(m_policy(mirror_torch_state).numpy())
 
         if mirror:
           env_action = (action + mirror_action) / 2
