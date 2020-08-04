@@ -617,16 +617,24 @@ class CassieEnv_v2:
       return self.vis.draw(self.sim)
 
   def mirror_state(self, state):
-    raise NotImplementedError
     state_est_indices = [0.01, 1, 2, 3,            # pelvis orientation
-                         -9, -10, 11, 12, 13,      # left motor pos
-                         -4,  -5,  6,  7,  8,      # right motor pos
-                         14, -15, 16,              # translational vel
-                         -17, 18, -19,             # rotational vel
-                         -25, -26, 27, 28, 29,     # left motor vel
-                         -20, -21, 22, 23, 24,     # right motor vel 
-                         32, 33, 30, 31,           # joint pos
-                         36, 37, 34, 35, ]         # joint vel
+                         -4, 5, -6,             # rotational vel
+                         -12, -13, 14, 15, 16,      # left motor pos
+                         -7,  -8,  9,  10,  11,      # right motor pos
+                         -22, -23, 24, 25, 26,     # left motor vel
+                         -17, -18, 19, 20, 21,     # right motor vel 
+                         29, 30, 27, 28,           # joint pos
+                         33, 34, 31, 32, ]         # joint vel
+
+    #state_est_indices = [0.01, 1, 2, 3,            # pelvis orientation
+    #                     -9, -10, 11, 12, 13,      # left motor pos
+    #                     -4,  -5,  6,  7,  8,      # right motor pos
+    #                     14, -15, 16,              # translational vel
+    #                     -17, 18, -19,             # rotational vel
+    #                     -25, -26, 27, 28, 29,     # left motor vel
+    #                     -20, -21, 22, 23, 24,     # right motor vel 
+    #                     32, 33, 30, 31,           # joint pos
+    #                     36, 37, 34, 35, ]         # joint vel
 
     return_as_1d = False
     if isinstance(state, list):
@@ -646,11 +654,11 @@ class CassieEnv_v2:
     else:
       raise NotImplementedError
 
-    if statedim == 45: # state estimator with clock and speed or height
-      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(7)]
-      sidespeed  = mirror_obs[-4]
-      sinclock   = mirror_obs[-6]
-      cosclock   = mirror_obs[-7]
+    if statedim == len(state_est_indices) + 6: # state estimator with clock and speed or height
+      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(6)]
+      sidespeed  = mirror_obs[-3]
+      sinclock   = mirror_obs[-5]
+      cosclock   = mirror_obs[-6]
       
       new_orient       = state[:,:4]
       new_orient       = np.array(list(map(inverse_quaternion, [new_orient[i] for i in range(batchdim)])))
