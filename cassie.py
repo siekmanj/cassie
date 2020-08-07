@@ -29,11 +29,10 @@ class CassieEnv_v2:
 
     state_est_size = 35
     clock_size     = 2 # [sin(t), cos(t)]
-    speed_size     = 2 # [x speed, y speed]
+    speed_size     = 6 # [x speed, y speed]
     height_size    = 1 # [pelvis height, foot apex height]
-    ratio_size     = 1 # [ratio]
 
-    obs_size = state_est_size + speed_size + height_size + clock_size + ratio_size
+    obs_size = state_est_size + speed_size + height_size + clock_size
 
     self.observation_space = np.zeros(obs_size)
 
@@ -67,9 +66,7 @@ class CassieEnv_v2:
 
     self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
 
-    self.max_orient_change = 0.2
-
-    self.max_speed = 4.0
+    self.max_speed = 2.0
     self.min_speed = -0.5
 
     self.max_side_speed  = 0.3
@@ -81,19 +78,13 @@ class CassieEnv_v2:
     self.max_height = 1.00
     self.min_height = 0.8
 
-    #self.max_foot_height = 0.13
-    #self.min_foot_height = 0.03
-
-    self.max_pitch_incline = 0.03
-    self.max_roll_incline = 0.03
+    self.max_pitch_incline = 0.0
+    self.max_roll_incline = 0.0
 
     self.encoder_noise = 0.05
 
     self.damping_low = 0.3
     self.damping_high = 5.0
-
-    self.max_simrate = 70
-    self.min_simrate = 50
 
     self.mass_low = 0.5
     self.mass_high = 1.75
@@ -105,10 +96,6 @@ class CassieEnv_v2:
     self.side_speed  = 0
     self.orient_add  = 0
     self.height      = 1.0
-    #self.foot_height = 0.05
-
-    self.min_swing_ratio = 0.40
-    self.max_swing_ratio = 0.8
 
     # Record default dynamics parameters
     self.default_damping = self.sim.get_dof_damping()
@@ -117,7 +104,9 @@ class CassieEnv_v2:
     self.default_fric = self.sim.get_geom_friction()
     self.default_rgba = self.sim.get_geom_rgba()
     self.default_quat = self.sim.get_geom_quat()
-    self.default_simrate = simrate
+
+    self.generate_new_left_target = True
+    self.generate_new_right_target = True
 
     self.motor_encoder_noise = np.zeros(10)
     self.joint_encoder_noise = np.zeros(6)
@@ -163,7 +152,7 @@ class CassieEnv_v2:
 
   def step(self, action):
 
-    delay_rand = 4
+    delay_rand = 7
     if self.dynamics_randomization:
       simrate = self.simrate + np.random.randint(-delay_rand, delay_rand+1)
     else:
@@ -187,46 +176,23 @@ class CassieEnv_v2:
     if reward < 0.45:
         done = True
 
-    if np.random.randint(300) == 0: # random changes to orientation
-      self.orient_add += np.random.uniform(-self.max_orient_change, self.max_orient_change)
-
     if np.random.randint(300) == 0: # random changes to commanded height
       self.height = np.random.uniform(self.min_height, self.max_height)
 
-    #if np.random.randint(300) == 0: # random changes to commanded foot height
-    #  self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
-
     if np.random.randint(300) == 0: # random changes to speed
       self.speed = np.random.uniform(self.min_speed, self.max_speed)
-
-      #self.speed += np.random.uniform(-0.1, 0.5)
-      #self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
-      #self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
-      #self.ratio     = self.bound_ratio(self.speed, ratio=self.ratio)
 
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
 
     if np.random.randint(300) == 0: # random changes to clock speed
-      self.phase_add = int(self.default_simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
-
-      #self.phase_add = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
-
-    if np.random.randint(300) == 0: # random changes to swing ratio
-      self.ratio = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
-
-    if np.random.randint(300) == 0 and self.dynamics_randomization:
-      self.simrate = int(np.random.uniform(self.min_simrate, self.max_simrate))
-
-      #self.ratio = self.bound_ratio(self.speed)
+      self.phase_add = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
 
     state = self.get_full_state() 
-
     self.last_action = action
-    self.last_pelvis_rot = self.cassie_state.pelvis.rotationalVelocity[:]
-    self.last_torque = np.asarray(self.cassie_state.motor.torque[:])
     return state, reward, done, {}
 
+  """
   def rotate_to_orient(self, vec):
     quaternion  = euler2quat(z=self.orient_add, y=0, x=0)
     iquaternion = inverse_quaternion(quaternion)
@@ -239,11 +205,17 @@ class CassieEnv_v2:
       if new_orient[0] < 0:
         new_orient = -new_orient
       return new_orient
-        
+  """
+
   def reset(self):
       self.phase = random.randint(0, self.phase_len)
       self.time = 0
       self.counter = 0
+
+      self.left_foot_target = np.array([0, 0, 0])
+      self.right_foot_target = np.array([0, 0, 0])
+      self.last_left_foot = self.left_foot_target
+      self.last_right_foot = self.right_foot_target
 
       self.state_history = [np.zeros(self._obs) for _ in range(self.history+1)]
 
@@ -317,9 +289,10 @@ class CassieEnv_v2:
           for _ in range(int(len(self.default_fric)/3)):
             fric_noise += [translational, torsional, rolling]
 
-          geom_plane = [np.random.uniform(-self.max_roll_incline, self.max_roll_incline), np.random.uniform(-self.max_pitch_incline, self.max_pitch_incline), 0]
-          quat_plane   = euler2quat(z=geom_plane[2], y=geom_plane[1], x=geom_plane[0])
-          geom_quat  = list(quat_plane) + list(self.default_quat[4:])
+          #geom_plane = [np.random.uniform(-self.max_roll_incline, self.max_roll_incline), np.random.uniform(-self.max_pitch_incline, self.max_pitch_incline), 0]
+          #quat_plane   = euler2quat(z=geom_plane[2], y=geom_plane[1], x=geom_plane[0])
+          #geom_quat  = list(quat_plane) + list(self.default_quat[4:])
+          geom_quat = self.default_quat
 
           self.motor_encoder_noise = np.random.uniform(-self.encoder_noise, self.encoder_noise, size=10)
           self.joint_encoder_noise = np.random.uniform(-self.encoder_noise, self.encoder_noise, size=6)
@@ -329,14 +302,12 @@ class CassieEnv_v2:
           self.sim.set_body_ipos(com_noise)
           self.sim.set_geom_friction(np.clip(fric_noise, 0, None))
           self.sim.set_geom_quat(geom_quat)
-          self.simrate = int(np.random.uniform(self.min_simrate, self.max_simrate))
       else:
           self.sim.set_body_mass(self.default_mass)
           self.sim.set_body_ipos(self.default_ipos)
           self.sim.set_dof_damping(self.default_damping)
           self.sim.set_geom_friction(self.default_fric)
           self.sim.set_geom_quat(self.default_quat)
-          self.simrate = int(self.default_simrate)
 
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
@@ -346,23 +317,24 @@ class CassieEnv_v2:
       self.cassie_state = self.sim.step_pd(self.u)
 
       self.orient_add  = 0
-      self.speed       = np.random.uniform(-0.5, 1.0)
+      self.speed       = np.random.uniform(-0.2, 0.3)
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
-      #self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
-      #self.phase_add   = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
-      self.phase_add   = int(self.default_simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
-      self.ratio       = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
+      self.phase_add   = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
+      self.ratio       = 0.5 #np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
 
       self.last_action = None
-      self.last_torque = None
-      self.last_pelvis_rot = None
       self.last_left_pos  = self.cassie_state.leftFoot.position[:]
       self.last_right_pos = self.cassie_state.rightFoot.position[:]
 
       self.last_t = self.sim.time()
 
       return self.get_full_state()
+
+  def get_feet_pos(self):
+    left_foot_pos  = np.array(self.sim.foot_pos()[:3])
+    right_foot_pos = np.array(self.sim.foot_pos()[3:])
+    return left_foot_pos, right_foot_pos
 
   def compute_reward(self, action):
     #####################
@@ -379,7 +351,7 @@ class CassieEnv_v2:
     # SPEED COST TERMS #
     ####################
 
-    pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
+    pelvis_vel = self.cassie_state.pelvis.translationalVelocity[:]
 
     x_vel = np.abs(pelvis_vel[0] - self.speed)
     if x_vel < 0.05:
@@ -395,7 +367,7 @@ class CassieEnv_v2:
     # ORIENTATION COST TERMS #
     ##########################
 
-    actual_q = self.rotate_to_orient(self.cassie_state.pelvis.orientation[:])
+    actual_q = self.cassie_state.pelvis.orientation[:]
     target_q = [1, 0, 0, 0]
     orientation_error = 6 * (1 - np.inner(actual_q, target_q) ** 2)
 
@@ -414,12 +386,70 @@ class CassieEnv_v2:
     # CLOCK REWARD TERMS #
     ######################
 
-    ratio         = self.ratio
+    ratio         = 0.5
     clock1_swing  = self.reward_clock(ratio=ratio,   alpha=0.15 * ratio,     flip=False)
     clock1_stance = self.reward_clock(ratio=1-ratio, alpha=0.15 * (1-ratio), flip=True)
 
     clock2_swing  = self.reward_clock(ratio=ratio,   alpha=0.15 * ratio,     flip=True)
     clock2_stance = self.reward_clock(ratio=1-ratio, alpha=0.15 * (1-ratio), flip=False)
+
+    a = 0.85 # measured empirically
+    b = 0.6
+
+    left_foot_pos, right_foot_pos = self.get_feet_pos()
+
+    rdelta = right_foot_pos - self.last_right_foot
+    ldelta = left_foot_pos  - self.last_left_foot
+
+    left_target  = 0
+    right_target = 0
+
+    right_target = clock1_stance * np.sum(np.abs(rdelta - self.right_foot_target)) * 4
+
+    left_target = clock2_stance * np.sum(np.abs(ldelta - self.left_foot_target)) * 4
+
+    right_global_target = list(self.last_right_foot + self.right_foot_target)
+    left_global_target  = list(self.last_left_foot  + self.left_foot_target)
+
+    if clock1_stance == 0 and self.generate_new_right_target:
+      self.last_right_foot = right_foot_pos
+      x_target = (self.speed      * (self.simrate / self.phase_add) * a)
+      y_target = (self.side_speed * (self.simrate / self.phase_add) * b)
+      z_target = 0
+
+      x_target += np.random.uniform(-0.06, 0.06)
+      y_target += np.random.uniform(-0.03, 0.03)
+      z_target += np.random.uniform(-0.01, 0.01)
+
+      #global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + right_foot_pos))
+      #self.right_foot_target = (global_target - right_foot_pos)
+      self.right_foot_target = np.array([x_target, y_target, z_target])
+
+      self.generate_new_right_target = False
+
+    if clock2_stance == 0 and self.generate_new_left_target:
+      self.last_left_foot = left_foot_pos
+      x_target = (self.speed      * (self.simrate / self.phase_add) * a)
+      y_target = (self.side_speed * (self.simrate / self.phase_add) * b)
+      z_target = 0
+
+      x_target += np.random.uniform(-0.06, 0.06)
+      y_target += np.random.uniform(-0.03, 0.03)
+      z_target += np.random.uniform(-0.01, 0.01)
+
+      #global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + left_foot_pos))
+      #self.left_foot_target = (global_target - left_foot_pos)
+      self.left_foot_target = np.array([x_target, y_target, z_target])
+
+      self.generate_new_left_target = False
+
+    foot_frc       = np.mean(self.sim_foot_frc, axis=0)
+    left_frc       = np.abs(foot_frc[0:3]).sum() / (200)
+    right_frc      = np.abs(foot_frc[6:9]).sum() / (200)
+
+    left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
+    right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
+
 
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / 100
@@ -431,26 +461,28 @@ class CassieEnv_v2:
     right_vel = np.sqrt(np.power(self.cassie_state.rightFoot.footTranslationalVelocity, 2).sum())
 
     #print("PELVIS VEL {:5.2}".format(pelvis_speed), end=', ')
-    #if clock1_swing > 0:
-    #  print("PUNISHING LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
-    #else:
-    #  print("IGNORING  LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
+    if clock1_swing > 0:
+      print("PUNISHING LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
+    else:
+      print("IGNORING  LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
 
-    #if clock2_swing > 0:
-    #  print("PUNISHING RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
-    #else:
-    #  print("IGNORING  RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
+    if clock2_swing > 0:
+      print("PUNISHING RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
+    else:
+      print("IGNORING  RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
 
-    #if clock1_stance > 0:
-    #  print("PUNISHING LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
-    #else:
-    #  print("IGNORING  LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
+    if clock1_stance > 0:
+      print("PUNISHING LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
+    else:
+      print("IGNORING  LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
 
-    #if clock2_stance > 0:
-    #  print("PUNISHING RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
-    #else:
-    #  print("IGNORING  RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
+    if clock2_stance > 0:
+      print("PUNISHING RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
+    else:
+      print("IGNORING  RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
 
+    print("LEFT TARGET", self.left_foot_target, "RIGHT TARGET", self.right_foot_target)
+    input()
     # Penalty which multiplies foot forces by 1 during swing, and 0 during stance.
     # (punish foot forces in the air)
     left_frc_penalty  = np.abs(clock1_swing * left_frc)
@@ -481,10 +513,7 @@ class CassieEnv_v2:
 
     # Torque cost term
     torque = np.asarray(self.cassie_state.motor.torque[:])
-    if self.last_torque is None:
-      torque_penalty = 0
-    else:
-      torque_penalty = 0.05 * sum(np.abs(torque)/len(torque))
+    torque_penalty = 0.05 * sum(np.abs(torque)/len(torque))
 
     # Action cost term
     if self.last_action is None:
@@ -573,11 +602,13 @@ class CassieEnv_v2:
 
       clock = self.get_clock()
       
-      ext_state = np.concatenate((clock, [self.speed, self.side_speed, self.height, self.ratio]))
+      ext_state = np.concatenate((self.left_foot_target, self.right_foot_target, clock, [self.height]))
 
-      pelvis_quat = self.rotate_to_orient(self.cassie_state.pelvis.orientation)
+      #pelvis_quat = self.rotate_to_orient(self.cassie_state.pelvis.orientation)
+      pelvis_quat = self.cassie_state.pelvis.orientation
 
-      pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
+      #pelvis_vel = self.rotate_to_orient(self.cassie_state.pelvis.translationalVelocity[:])
+      pelvis_vel = self.cassie_state.pelvis.translationalVelocity[:]
       pelvis_rvel = self.cassie_state.pelvis.rotationalVelocity[:]
 
       if self.dynamics_randomization:
