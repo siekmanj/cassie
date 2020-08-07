@@ -411,6 +411,9 @@ class CassieEnv_v2:
     right_global_target = list(self.last_right_foot + self.right_foot_target)
     left_global_target  = list(self.last_left_foot  + self.left_foot_target)
 
+    if clock1_stance > 0.8 and not self.generate_new_right_target:
+      self.generate_new_right_target = True
+
     if clock1_stance == 0 and self.generate_new_right_target:
       self.last_right_foot = right_foot_pos
       x_target = (self.speed      * (self.simrate / self.phase_add) * a)
@@ -426,6 +429,9 @@ class CassieEnv_v2:
       self.right_foot_target = np.array([x_target, y_target, z_target])
 
       self.generate_new_right_target = False
+
+    if clock2_stance > 0.8 and not self.generate_new_left_target:
+      self.generate_new_left_target = True
 
     if clock2_stance == 0 and self.generate_new_left_target:
       self.last_left_foot = left_foot_pos
