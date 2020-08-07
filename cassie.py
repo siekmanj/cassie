@@ -81,7 +81,7 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.0
     self.max_roll_incline = 0.0
 
-    self.encoder_noise = 0.05
+    self.encoder_noise = 0.01
 
     self.damping_low = 0.3
     self.damping_high = 5.0
@@ -312,6 +312,7 @@ class CassieEnv_v2:
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
 
+      self.create_stairs(np.random.uniform(1, 8), np.random.uniform(0.15, 1.0), np.random.uniform(0.05, 0.25), height=np.random.choice(a=[1,2,3,4,5,6,7]))
       self.sim.set_const()
 
       self.cassie_state = self.sim.step_pd(self.u)
@@ -335,6 +336,58 @@ class CassieEnv_v2:
     left_foot_pos  = np.array(self.sim.foot_pos()[:3])
     right_foot_pos = np.array(self.sim.foot_pos()[3:])
     return left_foot_pos, right_foot_pos
+
+  def create_stairs(self, start_x, stair_length, stair_rise, height=4):
+    max_boxes = 15
+
+    boxes = min(height, max_boxes // 2 + 1) * 2 + 1
+    
+    current_x = start_x
+    current_z = 1e-3
+    stair_width = 10
+    midway = boxes // 2 + 1
+    for i in range(1, midway):
+      current_z += stair_rise
+      current_x += stair_length/2
+      self.sim.set_geom_size([stair_length/2, stair_width, current_z/2], 'box' + str(i))
+      self.sim.set_geom_pos([current_x, 0, current_z/2], 'box' + str(i))
+      current_x += stair_length/2
+
+    intermediate = np.random.uniform(0.5, 3)
+    current_x += intermediate/2
+    self.sim.set_geom_size([intermediate/2, stair_width, current_z/2], 'box' + str(midway))
+    self.sim.set_geom_pos([current_x, 0, current_z/2], 'box' + str(midway))
+    current_x += intermediate/2
+
+    for i in range(midway+1, boxes+1):
+      current_x += stair_length/2
+      self.sim.set_geom_size([stair_length/2, stair_width, current_z/2], 'box' + str(i))
+      self.sim.set_geom_pos([current_x, 0, current_z/2], 'box' + str(i))
+      current_z -= stair_rise
+      current_x += stair_length/2
+
+    for i in range(boxes+1, max_boxes+1):
+      current_x += stair_length/2
+      self.sim.set_geom_size([0.1, 0.1, 0.1], 'box' + str(i))
+      self.sim.set_geom_pos([current_x, 20, 0], 'box' + str(i))
+
+
+  def check_step(self, x, y, z):
+    boxes = 15
+    for i in range(1, boxes+1):
+      box_d, box_w, box_h = self.sim.get_geom_size(name='box'+str(i))
+      box_x, box_y, box_z = self.sim.get_geom_pos(name='box'+str(i))
+
+      if x < box_x + box_d/2 and x > box_x - box_d/2 and \
+         y < box_y + box_w/2 and y > box_y - box_w/2:
+
+        #print("COLLISION ALERT BOX ", i, box_x)
+        #print("{:4.2f} < {:4.2f} < {:4.2f} AND {:4.2f} < {:4.2f} < {:4.2f}".format(box_x - box_d/2, x, box_x + box_d/2, box_y - box_w/2, y, box_y + box_w/2))
+        self.sim.set_geom_rgba([1.0, 0.5, 0.5, 1], name='box'+str(i))
+        return x, y, box_z + box_h/2
+      else:
+        self.sim.set_geom_rgba([0.5, 1.0, 0.5, 1], name='box'+str(i))
+    return x, y, z
 
   def compute_reward(self, action):
     #####################
@@ -424,9 +477,9 @@ class CassieEnv_v2:
       y_target += np.random.uniform(-0.03, 0.03)
       z_target += np.random.uniform(-0.01, 0.01)
 
-      #global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + right_foot_pos))
-      #self.right_foot_target = (global_target - right_foot_pos)
-      self.right_foot_target = np.array([x_target, y_target, z_target])
+      global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + right_foot_pos))
+      self.right_foot_target = (global_target - right_foot_pos)
+      #self.right_foot_target = np.array([x_target, y_target, z_target])
 
       self.generate_new_right_target = False
 
@@ -443,9 +496,9 @@ class CassieEnv_v2:
       y_target += np.random.uniform(-0.03, 0.03)
       z_target += np.random.uniform(-0.01, 0.01)
 
-      #global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + left_foot_pos))
-      #self.left_foot_target = (global_target - left_foot_pos)
-      self.left_foot_target = np.array([x_target, y_target, z_target])
+      global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + left_foot_pos))
+      self.left_foot_target = (global_target - left_foot_pos)
+      #self.left_foot_target = np.array([x_target, y_target, z_target])
 
       self.generate_new_left_target = False
 
@@ -461,34 +514,9 @@ class CassieEnv_v2:
     left_frc       = np.abs(foot_frc[0:3]).sum() / 100
     right_frc      = np.abs(foot_frc[6:9]).sum() / 100
 
-    #pelvis_speed = np.sqrt(np.power(pelvis_vel, 2).sum())
-
     left_vel  = np.sqrt(np.power(self.cassie_state.leftFoot.footTranslationalVelocity, 2).sum())
     right_vel = np.sqrt(np.power(self.cassie_state.rightFoot.footTranslationalVelocity, 2).sum())
 
-    #print("PELVIS VEL {:5.2}".format(pelvis_speed), end=', ')
-    if clock1_swing > 0:
-      print("PUNISHING LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
-    else:
-      print("IGNORING  LEFT  FORCES {:3.2f} * {:5.2f}".format(clock1_swing, left_frc), end=", ")
-
-    if clock2_swing > 0:
-      print("PUNISHING RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
-    else:
-      print("IGNORING  RIGHT FORCES {:3.2f} * {:5.2f}".format(clock2_swing, right_frc), end=", ")
-
-    if clock1_stance > 0:
-      print("PUNISHING LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
-    else:
-      print("IGNORING  LEFT  VELOCITIES {:3.2f} * {:5.2f}".format(clock1_stance, left_vel), end=", ")
-
-    if clock2_stance > 0:
-      print("PUNISHING RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
-    else:
-      print("IGNORING  RIGHT VELOCITIES {:3.2f} * {:5.2f}".format(clock2_stance, right_vel), end=", ")
-
-    print("LEFT TARGET", self.left_foot_target, "RIGHT TARGET", self.right_foot_target)
-    input()
     # Penalty which multiplies foot forces by 1 during swing, and 0 during stance.
     # (punish foot forces in the air)
     left_frc_penalty  = np.abs(clock1_swing * left_frc)
