@@ -560,10 +560,11 @@ class CassieEnv_v2:
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
              0.200 * np.exp(-foot_frc_err) +                   \
-             0.200 * np.exp(-x_vel) +                          \
-             0.125 * np.exp(-pelvis_acc) +                     \
-             0.100 * np.exp(-y_vel) +                          \
-             0.075 * np.exp(-pelvis_hgt) +                     \
+             0.200 * np.exp(-(left_foot_target + right_foot_target)) + \
+             0.150 * np.exp(-pelvis_acc) +                     \
+             0.050 * np.exp(-x_vel) +                          \
+             0.050 * np.exp(-y_vel) +                          \
+             0.050 * np.exp(-pelvis_hgt) +                     \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
