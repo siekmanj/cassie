@@ -381,7 +381,6 @@ class CassieEnv_v2:
       if x < box_x + box_d/2 and x > box_x - box_d/2 and \
          y < box_y + box_w/2 and y > box_y - box_w/2:
 
-        #print("COLLISION ALERT BOX ", i, box_x)
         #print("{:4.2f} < {:4.2f} < {:4.2f} AND {:4.2f} < {:4.2f} < {:4.2f}".format(box_x - box_d/2, x, box_x + box_d/2, box_y - box_w/2, y, box_y + box_w/2))
         self.sim.set_geom_rgba([1.0, 0.5, 0.5, 1], name='box'+str(i))
         return x, y, box_z + box_h/2
@@ -683,14 +682,16 @@ class CassieEnv_v2:
       return self.vis.draw(self.sim)
 
   def mirror_state(self, state):
-    state_est_indices = [0.01, 1, 2, 3,            # pelvis orientation
+    state_est_indices = [0.01, 1, 2, 3,         # pelvis orientation
                          -4, 5, -6,             # rotational vel
                          -12, -13, 14, 15, 16,      # left motor pos
                          -7,  -8,  9,  10,  11,      # right motor pos
                          -22, -23, 24, 25, 26,     # left motor vel
                          -17, -18, 19, 20, 21,     # right motor vel 
                          29, 30, 27, 28,           # joint pos
-                         33, 34, 31, 32, ]         # joint vel
+                         33, 34, 31, 32, # joint vel
+                         38, -39, 40,
+                         35, -36, 37,]
 
     #state_est_indices = [0.01, 1, 2, 3,            # pelvis orientation
     #                     -9, -10, 11, 12, 13,      # left motor pos
@@ -720,11 +721,10 @@ class CassieEnv_v2:
     else:
       raise NotImplementedError
 
-    if statedim == len(state_est_indices) + 6: # state estimator with clock and speed or height
-      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(6)]
-      sidespeed  = mirror_obs[-3]
-      sinclock   = mirror_obs[-5]
-      cosclock   = mirror_obs[-6]
+    if statedim == len(state_est_indices) + 3: # state estimator with clock and speed or height
+      mirror_obs = state_est_indices + [len(state_est_indices) + i for i in range(3)]
+      sinclock   = mirror_obs[-2]
+      cosclock   = mirror_obs[-3]
       
       new_orient       = state[:,:4]
       new_orient       = np.array(list(map(inverse_quaternion, [new_orient[i] for i in range(batchdim)])))
@@ -735,9 +735,7 @@ class CassieEnv_v2:
 
       mirrored_state = np.copy(state)
       for idx, i in enumerate(mirror_obs):
-        if i == sidespeed:
-          mirrored_state[:,idx] = -1 * state[:,idx]
-        elif i == sinclock or i == cosclock:
+        if i == sinclock or i == cosclock:
           mirrored_state[:,idx] = (np.sin(np.arcsin(state[:,i]) + np.pi))
         else:
           mirrored_state[:,idx] = (np.sign(i) * state[:,abs(int(i))])
