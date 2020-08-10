@@ -66,8 +66,8 @@ class CassieEnv_v2:
 
     self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
 
-    self.max_speed = 2.0
-    self.min_speed = -0.5
+    self.max_speed = 1.5
+    self.min_speed = -0.2
 
     self.max_side_speed  = 0.3
     self.min_side_speed  = -0.3
@@ -81,7 +81,7 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.0
     self.max_roll_incline = 0.0
 
-    self.encoder_noise = 0.01
+    self.encoder_noise = 0.008
 
     self.damping_low = 0.3
     self.damping_high = 5.0
@@ -472,8 +472,8 @@ class CassieEnv_v2:
       y_target = (self.side_speed * (self.simrate / self.phase_add) * b)
       z_target = 0
 
-      x_target += np.random.uniform(-0.06, 0.06)
-      y_target += np.random.uniform(-0.03, 0.03)
+      x_target += np.random.uniform(-0.02, 0.02)
+      y_target += np.random.uniform(-0.02, 0.02)
       z_target += np.random.uniform(-0.01, 0.01)
 
       global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + right_foot_pos))
@@ -491,8 +491,8 @@ class CassieEnv_v2:
       y_target = (self.side_speed * (self.simrate / self.phase_add) * b)
       z_target = 0
 
-      x_target += np.random.uniform(-0.06, 0.06)
-      y_target += np.random.uniform(-0.03, 0.03)
+      x_target += np.random.uniform(-0.02, 0.02)
+      y_target += np.random.uniform(-0.02, 0.02)
       z_target += np.random.uniform(-0.01, 0.01)
 
       global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + left_foot_pos))
@@ -554,7 +554,7 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    pelvis_acc = 0.15 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.10 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
