@@ -180,6 +180,12 @@ def run_udp(policy_files):
   mirror       = False
   torques      = 0
 
+  left_foot_target  = np.array([0, 0, 0])
+  right_foot_target = np.array([0, 0, 0])
+
+  generate_new_left_target = True
+  generate_new_right_target = True
+
   old_state = env.observation_space
 
   if hasattr(policy, 'init_hidden_state'):
@@ -367,7 +373,41 @@ def run_udp(policy_files):
         if new_orient[0] < 0:
           new_orient = [-1 * x for x in new_orient]
 
-        ext_state   = np.concatenate((clock, [speed, side_speed, cmd_height, ratio]))
+        omega = 0.02
+        clock1 = (omega+1) * np.clip(np.cos(2 * np.pi * phase / env.phase_len)         - omega, 0, 1) # left force,  right vel
+        clock2 = (omega+1) * np.clip(np.cos(2 * np.pi * phase / env.phase_len + np.pi) - omega, 0, 1) # right force, left vel
+        a = 0.85 # measured empirically
+        b = 0.6
+
+        if clock1 > 0.8 and not generate_new_right_target:
+          generate_new_right_target = True
+
+        if clock2 > 0.8 and not generate_new_left_target:
+          generate_new_left_target = True
+
+        if clock1 == 0 and generate_new_right_target:
+          x_target = (speed      * (env.simrate / phase_add) * a)
+          y_target = (side_speed * (env.simrate / phase_add) * b)
+
+          x_target += np.random.uniform(-0.02, 0.02)
+          y_target += np.random.uniform(-0.01, 0.01)
+
+          right_foot_target = np.array([x_target, y_target, 0])
+
+          generate_new_right_target = False
+
+        if clock2 == 0 and generate_new_left_target:
+          x_target = (speed      * (env.simrate / phase_add) * a)
+          y_target = (side_speed * (env.simrate / phase_add) * b)
+
+          x_target += np.random.uniform(-0.02, 0.02)
+          y_target += np.random.uniform(-0.01, 0.01)
+
+          left_foot_target = np.array([x_target, y_target, 0])
+
+          generate_new_left_target = False
+
+        ext_state = np.concatenate((left_foot_target, right_foot_target, clock, [cmd_height]))
 
         pelvis_vel   = rotate_by_quaternion(state.pelvis.translationalVelocity[:], iquaternion)
         pelvis_rvel  = state.pelvis.rotationalVelocity[:]
@@ -447,7 +487,7 @@ def run_udp(policy_files):
         
         torques   = torques * 0.95 + 0.05 * np.abs(state.motor.torque[:]).sum()
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
-        ratio     = env.bound_ratio(speed, ratio=ratio)
+        #ratio     = env.bound_ratio(speed, ratio=ratio)
         print("MODE {:10s} | Des. Spd. {:5.2f} | Speed {:5.1f} | Sidespeed {:5.2f} | Heading {:5.1f} | Freq. {:3d} | Delay {:6.3f} (target {:6.3f}) | Torques {:7.2f} | Height {:6.4f} | Foot Apex {:6.5f} | Ratio {:3.2f} | {:20s}".format(mode, speed, actual_speed, side_speed, orient_add, int(phase_add), delay, delay_target * (env.simrate / 2000), torques, cmd_height, cmd_foot_height, ratio, ''), end='\r')
 
 

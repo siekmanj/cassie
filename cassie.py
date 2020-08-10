@@ -537,8 +537,8 @@ class CassieEnv_v2:
     lhgt = sim_height + self.cassie_state.leftFoot.position[:][2]
     rhgt = sim_height + self.cassie_state.rightFoot.position[:][2]
 
-    #foot_height_err = 6 * (clock1_swing * np.abs(lhgt - self.foot_height) + \
-    #                       clock2_swing * np.abs(rhgt - self.foot_height))
+    foot_height_err = 6 * (clock1_swing * np.abs(lhgt - .15) + \
+                           clock2_swing * np.abs(rhgt - .15))
 
     ########################
     # JERKINESS COST TERMS #
@@ -559,8 +559,9 @@ class CassieEnv_v2:
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
              0.200 * np.exp(-foot_frc_err) +                   \
-             0.200 * np.exp(-(left_target + right_target)) + \
-             0.150 * np.exp(-pelvis_acc) +                     \
+             0.200 * np.exp(-(left_target + right_target)) +   \
+             0.100 * np.exp(-pelvis_acc) +                     \
+             0.050 * np.exp(-foot_height_err) +                \
              0.050 * np.exp(-x_vel) +                          \
              0.050 * np.exp(-y_vel) +                          \
              0.050 * np.exp(-pelvis_hgt) +                     \
