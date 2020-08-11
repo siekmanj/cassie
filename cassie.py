@@ -113,6 +113,7 @@ class CassieEnv_v2:
 
   def step_simulation(self, action):
     
+    #print(self.sim.get_foot_force())
     self.sim_foot_frc.append(self.sim.get_foot_force())
     self.sim_height.append(self.cassie_state.pelvis.position[2] - self.cassie_state.terrain.height)
     
@@ -512,6 +513,7 @@ class CassieEnv_v2:
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / 100
     right_frc      = np.abs(foot_frc[6:9]).sum() / 100
+    #print(foot_frc)
 
     left_vel  = np.sqrt(np.power(self.cassie_state.leftFoot.footTranslationalVelocity, 2).sum())
     right_vel = np.sqrt(np.power(self.cassie_state.rightFoot.footTranslationalVelocity, 2).sum())
@@ -526,7 +528,7 @@ class CassieEnv_v2:
     left_vel_penalty  = np.abs(clock1_stance * left_vel)
     right_vel_penalty = np.abs(clock2_stance * right_vel)
 
-    #print("FRC PENALTY: {:6.3f}".format(np.exp(-(left_frc_penalty + right_frc_penalty))))
+    #print("FRC PENALTY: exp(-{:6.3f} * {:6.3f}), exp(-{:6.3f} * {:6.3f})".format(clock1_swing, left_frc, clock2_swing, right_frc))
     #input()
 
     left_penalty  = left_frc_penalty + left_vel_penalty

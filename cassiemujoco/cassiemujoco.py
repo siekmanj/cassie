@@ -140,7 +140,7 @@ class CassieSim:
     y = state_out_t()
     force = np.zeros(12)
     self.foot_force(force)
-    return force[[2, 8]]
+    return force
 
   def get_dof_damping(self):
     ptr = cassie_sim_dof_damping(self.c)
