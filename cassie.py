@@ -66,7 +66,7 @@ class CassieEnv_v2:
 
     self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
 
-    self.max_speed = 1.5
+    self.max_speed = 1.0
     self.min_speed = -0.2
 
     self.max_side_speed  = 0.3
@@ -181,7 +181,10 @@ class CassieEnv_v2:
       self.height = np.random.uniform(self.min_height, self.max_height)
 
     if np.random.randint(300) == 0: # random changes to speed
-      self.speed = np.random.uniform(self.min_speed, self.max_speed)
+      new_speed   = np.random.uniform(self.min_speed, self.max_speed)
+      speed_delta = np.clip(new_speed - self.speed, -0.2, 0.2)
+      #print("CHANGING SPEED FROM {} TO {}, DELTA{}".format(self.speed, self.speed + speed_delta, speed_delta))
+      self.speed += speed_delta
 
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
@@ -313,7 +316,7 @@ class CassieEnv_v2:
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
 
-      self.create_stairs(np.random.uniform(1, 8), np.random.uniform(0.15, 1.0), np.random.uniform(0.05, 0.25), height=np.random.choice(a=[1,2,3,4,5,6,7]))
+      self.create_stairs(np.random.uniform(0.2, 5.0), np.random.uniform(0.15, 1.0), np.random.uniform(0.01, 0.25), height=np.random.choice(a=[1,2,3,4,5,6,7]))
       self.sim.set_const()
 
       self.cassie_state = self.sim.step_pd(self.u)
@@ -379,11 +382,16 @@ class CassieEnv_v2:
       box_d, box_w, box_h = self.sim.get_geom_size(name='box'+str(i))
       box_x, box_y, box_z = self.sim.get_geom_pos(name='box'+str(i))
 
-      if x < box_x + box_d/2 and x > box_x - box_d/2 and \
-         y < box_y + box_w/2 and y > box_y - box_w/2:
+      #print("CHECKING BOX {}".format('box'+str(i)))
+      #print("\t{:4.2f} < {:4.2f} < {:4.2f} AND {:4.2f} < {:4.2f} < {:4.2f}".format(box_x - box_d, x, box_x + box_d, box_y - box_w, y, box_y + box_w))
+      #if x < box_x - box_d:
+      #    print(" RETURNING EARLY")
+      #    break
+      if x < box_x + box_d and x > box_x - box_d and \
+         y < box_y + box_w and y > box_y - box_w:
 
-        #print("{:4.2f} < {:4.2f} < {:4.2f} AND {:4.2f} < {:4.2f} < {:4.2f}".format(box_x - box_d/2, x, box_x + box_d/2, box_y - box_w/2, y, box_y + box_w/2))
         self.sim.set_geom_rgba([1.0, 0.5, 0.5, 1], name='box'+str(i))
+        #print("RETURNING Z FROM BOX {}, {}".format(i, box_h/2))
         return x, y, box_z + box_h/2
       else:
         self.sim.set_geom_rgba([0.5, 1.0, 0.5, 1], name='box'+str(i))
@@ -478,6 +486,11 @@ class CassieEnv_v2:
       z_target += np.random.uniform(-0.01, 0.01)
 
       global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + right_foot_pos))
+      #print("RIGHT FOOT TOUCHDOWN JUST HAPPENED")
+      #print("CREATING NEW RIGHT TARGET")
+      #self.sim.set_geom_size([0.1, 0.1, 0.1], 'box13')
+      #self.sim.set_geom_pos(global_target + np.array([0, 1, 0.2]), 'box13')
+      #input()
       self.right_foot_target = (global_target - right_foot_pos)
       #self.right_foot_target = np.array([x_target, y_target, z_target])
 
@@ -497,6 +510,11 @@ class CassieEnv_v2:
       z_target += np.random.uniform(-0.01, 0.01)
 
       global_target = self.check_step(*(np.array([x_target, y_target, z_target]) + left_foot_pos))
+      #print("LEFT FOOT TOUCHDOWN JUST HAPPENED")
+      #print("CREATING NEW LEFT TARGET")
+      #self.sim.set_geom_size([0.1, 0.1, 0.1], 'box15')
+      #self.sim.set_geom_pos(global_target + np.array([0, -1, 0.2]), 'box15')
+      #input()
       self.left_foot_target = (global_target - left_foot_pos)
       #self.left_foot_target = np.array([x_target, y_target, z_target])
 
