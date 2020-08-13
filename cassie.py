@@ -565,11 +565,11 @@ class CassieEnv_v2:
              0.200 * np.exp(-foot_frc_err) +                   \
              0.200 * np.exp(-(left_target + right_target)) +   \
              0.150 * np.exp(-pelvis_acc) +                     \
-             0.075 * np.exp(-torque_penalty)
+             0.075 * np.exp(-torque_penalty) +                 \
              0.050 * np.exp(-pelvis_hgt) +                     \
              0.025 * np.exp(-x_vel) +                          \
              0.025 * np.exp(-y_vel) +                          \
-             0.025 * np.exp(-ctrl_penalty) +                   \
+             0.025 * np.exp(-ctrl_penalty)
 
     return reward
 
