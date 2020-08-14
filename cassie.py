@@ -66,8 +66,8 @@ class CassieEnv_v2:
 
     self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
 
-    self.max_speed = 1.0
-    self.min_speed = -0.2
+    self.max_speed = 1.5
+    self.min_speed = -0.3
 
     self.max_side_speed  = 0.3
     self.min_side_speed  = -0.3
@@ -316,7 +316,7 @@ class CassieEnv_v2:
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
 
-      self.create_stairs(np.random.uniform(0.2, 5.0), np.random.uniform(0.15, 1.0), np.random.uniform(0.01, 0.25), height=np.random.choice(a=[1,2,3,4,5,6,7]))
+      self.create_stairs(np.random.uniform(0.2, 3.0), np.random.uniform(0.15, 1.0), np.random.uniform(0.01, 0.25), height=np.random.choice(a=[1,2,3,4,5,6,7]))
       self.sim.set_const()
 
       self.cassie_state = self.sim.step_pd(self.u)
