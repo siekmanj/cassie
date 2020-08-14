@@ -521,17 +521,8 @@ class CassieEnv_v2:
       self.generate_new_left_target = False
 
     foot_frc       = np.mean(self.sim_foot_frc, axis=0)
-    left_frc       = np.abs(foot_frc[0:3]).sum() / (200)
-    right_frc      = np.abs(foot_frc[6:9]).sum() / (200)
-
-    left_vel  = np.abs(self.cassie_state.leftFoot.footTranslationalVelocity).sum()
-    right_vel = np.abs(self.cassie_state.rightFoot.footTranslationalVelocity).sum()
-
-
-    foot_frc       = np.mean(self.sim_foot_frc, axis=0)
     left_frc       = np.abs(foot_frc[0:3]).sum() / 100
     right_frc      = np.abs(foot_frc[6:9]).sum() / 100
-    #print(foot_frc)
 
     left_vel  = np.sqrt(np.power(self.cassie_state.leftFoot.footTranslationalVelocity, 2).sum())
     right_vel = np.sqrt(np.power(self.cassie_state.rightFoot.footTranslationalVelocity, 2).sum())
@@ -553,20 +544,13 @@ class CassieEnv_v2:
     right_penalty = right_frc_penalty + right_vel_penalty
     foot_frc_err  = left_penalty + right_penalty
 
-    # Penalty which punishes foot heights too far from the commanded apex
-    lhgt = sim_height + self.cassie_state.leftFoot.position[:][2]
-    rhgt = sim_height + self.cassie_state.rightFoot.position[:][2]
-
-    foot_height_err = 6 * (clock1_swing * np.abs(lhgt - .15) + \
-                           clock2_swing * np.abs(rhgt - .15))
-
     ########################
     # JERKINESS COST TERMS #
     ########################
 
     # Torque cost term
     torque = np.asarray(self.cassie_state.motor.torque[:])
-    torque_penalty = 0.05 * sum(np.abs(torque)/len(torque))
+    torque_penalty = 0.10 * sum(np.abs(torque)/len(torque))
 
     # Action cost term
     if self.last_action is None:
@@ -574,19 +558,18 @@ class CassieEnv_v2:
     else:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
-    pelvis_acc = 0.10 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    pelvis_acc = 0.15 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
              0.200 * np.exp(-foot_frc_err) +                   \
              0.200 * np.exp(-(left_target + right_target)) +   \
-             0.100 * np.exp(-pelvis_acc) +                     \
-             0.050 * np.exp(-foot_height_err) +                \
-             0.050 * np.exp(-x_vel) +                          \
-             0.050 * np.exp(-y_vel) +                          \
+             0.150 * np.exp(-pelvis_acc) +                     \
+             0.075 * np.exp(-torque_penalty) +                 \
              0.050 * np.exp(-pelvis_hgt) +                     \
-             0.025 * np.exp(-ctrl_penalty) +                   \
-             0.025 * np.exp(-torque_penalty)
+             0.025 * np.exp(-x_vel) +                          \
+             0.025 * np.exp(-y_vel) +                          \
+             0.025 * np.exp(-ctrl_penalty)
 
     return reward
 
