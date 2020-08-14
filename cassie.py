@@ -180,9 +180,9 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded height
       self.height = np.random.uniform(self.min_height, self.max_height)
 
-    if np.random.randint(300) == 0: # random changes to speed
+    if np.random.randint(200) == 0: # random changes to speed
       new_speed   = np.random.uniform(self.min_speed, self.max_speed)
-      speed_delta = np.clip(new_speed - self.speed, -0.2, 0.2)
+      speed_delta = np.clip(new_speed - self.speed, -0.2, 0.3)
       #print("CHANGING SPEED FROM {} TO {}, DELTA{}".format(self.speed, self.speed + speed_delta, speed_delta))
       self.speed += speed_delta
 
@@ -322,7 +322,7 @@ class CassieEnv_v2:
       self.cassie_state = self.sim.step_pd(self.u)
 
       self.orient_add  = 0
-      self.speed       = np.random.uniform(-0.2, 0.3)
+      self.speed       = np.random.uniform(-0.2, 0.5)
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
       self.phase_add   = int(self.simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
