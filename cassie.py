@@ -448,11 +448,11 @@ class CassieEnv_v2:
     ######################
 
     ratio         = 0.5
-    clock1_swing  = self.reward_clock(ratio=ratio,   alpha=0.15 * ratio,     flip=False)
-    clock1_stance = self.reward_clock(ratio=1-ratio, alpha=0.15 * (1-ratio), flip=True)
+    clock1_swing  = self.reward_clock(ratio=ratio,   alpha=0.02 * ratio,     flip=False)
+    clock1_stance = self.reward_clock(ratio=1-ratio, alpha=0.02 * (1-ratio), flip=True)
 
-    clock2_swing  = self.reward_clock(ratio=ratio,   alpha=0.15 * ratio,     flip=True)
-    clock2_stance = self.reward_clock(ratio=1-ratio, alpha=0.15 * (1-ratio), flip=False)
+    clock2_swing  = self.reward_clock(ratio=ratio,   alpha=0.02 * ratio,     flip=True)
+    clock2_stance = self.reward_clock(ratio=1-ratio, alpha=0.02 * (1-ratio), flip=False)
 
     a = 0.85 # measured empirically
     b = 0.6
@@ -565,10 +565,8 @@ class CassieEnv_v2:
              0.200 * np.exp(-foot_frc_err) +                   \
              0.200 * np.exp(-(left_target + right_target)) +   \
              0.150 * np.exp(-pelvis_acc) +                     \
-             0.075 * np.exp(-torque_penalty) +                 \
+             0.125 * np.exp(-torque_penalty) +                 \
              0.050 * np.exp(-pelvis_hgt) +                     \
-             0.025 * np.exp(-x_vel) +                          \
-             0.025 * np.exp(-y_vel) +                          \
              0.025 * np.exp(-ctrl_penalty)
 
     return reward
