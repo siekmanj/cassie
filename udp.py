@@ -420,30 +420,31 @@ def run_udp(policy_files):
         p_gain = env_action[10:20] if len(action) > 10 else np.zeros(10)
         d_gain = env_action[20:30] if len(action) > 20 else np.zeros(10)
 
-        if ESTOP or operation_mode == 2:
-          for i in range(5):
-            u.leftLeg.motorPd.pGain[i] = 0.001
-            u.leftLeg.motorPd.dGain[i] = D_mult*env.D[i]
-            u.rightLeg.motorPd.pGain[i] = 0.001
-            u.rightLeg.motorPd.dGain[i] = D_mult*env.D[i]
-            u.leftLeg.motorPd.pTarget[i] = 0.001
-            u.rightLeg.motorPd.pTarget[i] = 0.001
-        else:
-          # Send action
-          for i in range(5):
-            u.leftLeg.motorPd.pGain[i] = env.P[i] + p_gain[i]
-            u.leftLeg.motorPd.dGain[i] = env.D[i] + d_gain[i]
-            u.rightLeg.motorPd.pGain[i] = env.P[i] + p_gain[i+5]
-            u.rightLeg.motorPd.dGain[i] = env.D[i] + d_gain[i+5]
-            u.leftLeg.motorPd.pTarget[i] = target[i]
-            u.rightLeg.motorPd.pTarget[i] = target[i+5]
+        for _ in range(env.simrate):
+          if ESTOP or operation_mode == 2:
+            for i in range(5):
+              u.leftLeg.motorPd.pGain[i] = 0.001
+              u.leftLeg.motorPd.dGain[i] = D_mult*env.D[i]
+              u.rightLeg.motorPd.pGain[i] = 0.001
+              u.rightLeg.motorPd.dGain[i] = D_mult*env.D[i]
+              u.leftLeg.motorPd.pTarget[i] = 0.001
+              u.rightLeg.motorPd.pTarget[i] = 0.001
+          else:
+            # Send action
+            for i in range(5):
+              u.leftLeg.motorPd.pGain[i] = env.P[i] + p_gain[i]
+              u.leftLeg.motorPd.dGain[i] = env.D[i] + d_gain[i]
+              u.rightLeg.motorPd.pGain[i] = env.P[i] + p_gain[i+5]
+              u.rightLeg.motorPd.dGain[i] = env.D[i] + d_gain[i+5]
+              u.leftLeg.motorPd.pTarget[i] = target[i]
+              u.rightLeg.motorPd.pTarget[i] = target[i+5]
 
-          time_log.append(time.time())
-          state_log.append(state)
-          input_log.append(RL_state)
-          output_log.append(env_action)
-          target_log.append(target)
-        cassie.send_pd(u)
+          cassie.send_pd(u)
+        time_log.append(time.time())
+        state_log.append(state)
+        input_log.append(RL_state)
+        output_log.append(env_action)
+        target_log.append(target)
         
         torques   = torques * 0.95 + 0.05 * np.abs(state.motor.torque[:]).sum()
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
@@ -460,10 +461,10 @@ def run_udp(policy_files):
         delay_target = 1
         while (time.monotonic() - t) * delay_target < env.simrate / 2000:
             time.sleep(5e-3)
-        delay = (time.monotonic() - t) * 1000
+        delay = 0.9 * delay + 0.1 * (time.monotonic() - t) * 1000
 
-        if delay - 5 > delay_target * 1000 * env.simrate / 2000:
-          print("\nWARNING: DELAY HIGH {:6.3f} vs {:6.3f} , {}".format(delay, 1000 * env.simrate / 2000, delay > 1000 * env.simrate / 2000))
+        #if delay - 5 > delay_target * 1000 * env.simrate / 2000:
+        #  print("\nWARNING: DELAY HIGH {:6.3f} vs {:6.3f} , {}".format(delay, 1000 * env.simrate / 2000, delay > 1000 * env.simrate / 2000))
 
   finally:
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
