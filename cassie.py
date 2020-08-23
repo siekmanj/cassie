@@ -316,7 +316,7 @@ class CassieEnv_v2:
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
 
-      self.create_stairs(np.random.uniform(0.2, 3.0), np.random.uniform(0.15, 1.0), np.random.uniform(0.01, 0.25), height=np.random.choice(a=[1,2,3,4,5,6,7]))
+      self.create_stairs(np.random.uniform(0.5, 3.0), np.random.uniform(0.25, 1.0), np.random.uniform(0.01, 0.1), height=np.random.choice(a=[1,2,3,4,5,6,7]))
       self.sim.set_const()
 
       self.cassie_state = self.sim.step_pd(self.u)
