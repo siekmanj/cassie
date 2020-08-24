@@ -69,7 +69,7 @@ class CassieEnv_v2:
 
     self.max_orient_change = 0.2
 
-    self.max_speed = 4.0
+    self.max_speed = 3.0
     self.min_speed = -0.5
 
     self.max_side_speed  = 0.3
