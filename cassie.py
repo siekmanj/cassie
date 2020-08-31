@@ -44,10 +44,10 @@ class CassieEnv_v2:
     self.observation_space = np.zeros(self._obs + self._obs * self.history)
 
     if impedance:
-      self.action_space = np.zeros(30)
+      self.action_space = np.zeros(31)
       #self.action_space = np.zeros(20)
     else:
-      self.action_space = np.zeros(10)
+      self.action_space = np.zeros(11)
 
     self.impedance = impedance
 
@@ -92,8 +92,8 @@ class CassieEnv_v2:
     self.damping_low = 0.3
     self.damping_high = 5.0
 
-    self.max_simrate = 70
-    self.min_simrate = 50
+    self.max_simrate = 65
+    self.min_simrate = 55
 
     self.mass_low = 0.5
     self.mass_high = 1.75
@@ -172,7 +172,9 @@ class CassieEnv_v2:
     self.sim_foot_frc = []
     self.sim_height   = []
     for _ in range(simrate):
-        self.step_simulation(action)
+        self.step_simulation(action[:-1])
+
+    self.phase_add = int(self.default_simrate * np.exp(action[-1]/5))
 
     self.time  += 1
     self.phase += self.phase_add
@@ -184,7 +186,7 @@ class CassieEnv_v2:
     reward = self.compute_reward(action)
 
     done = False
-    if reward < 0.45:
+    if reward < 0.3:
         done = True
 
     if np.random.randint(300) == 0: # random changes to orientation
@@ -193,32 +195,17 @@ class CassieEnv_v2:
     if np.random.randint(300) == 0: # random changes to commanded height
       self.height = np.random.uniform(self.min_height, self.max_height)
 
-    #if np.random.randint(300) == 0: # random changes to commanded foot height
-    #  self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
-
     if np.random.randint(300) == 0: # random changes to speed
       self.speed = np.random.uniform(self.min_speed, self.max_speed)
 
-      #self.speed += np.random.uniform(-0.1, 0.5)
-      #self.speed = np.clip(self.speed, self.min_speed, self.max_speed)
-      #self.phase_add = int(self.simrate * self.bound_freq(self.speed, self.phase_add/self.simrate))
-      #self.ratio     = self.bound_ratio(self.speed, ratio=self.ratio)
-
     if np.random.randint(300) == 0: # random changes to sidespeed
       self.side_speed = np.random.uniform(self.min_side_speed, self.max_side_speed)
-
-    if np.random.randint(300) == 0: # random changes to clock speed
-      self.phase_add = int(self.default_simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
-
-      #self.phase_add = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
 
     if np.random.randint(300) == 0: # random changes to swing ratio
       self.ratio = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
 
     if np.random.randint(300) == 0 and self.dynamics_randomization:
       self.simrate = int(np.random.uniform(self.min_simrate, self.max_simrate))
-
-      #self.ratio = self.bound_ratio(self.speed)
 
     state = self.get_full_state() 
 
@@ -349,9 +336,7 @@ class CassieEnv_v2:
       self.speed       = np.random.uniform(-0.5, 1.0)
       self.side_speed  = np.random.uniform(self.min_side_speed, self.max_side_speed)
       self.height      = np.random.uniform(self.min_height, self.max_height)
-      #self.foot_height = np.random.uniform(self.min_foot_height, self.max_foot_height)
-      #self.phase_add   = int(self.simrate * self.bound_freq(self.speed, generate_new=True))
-      self.phase_add   = int(self.default_simrate * np.random.uniform(self.min_step_freq, self.max_step_freq))
+      self.phase_add   = int(self.default_simrate)
       self.ratio       = np.random.uniform(self.min_swing_ratio, self.max_swing_ratio)
 
       self.last_action = None
@@ -365,6 +350,11 @@ class CassieEnv_v2:
       return self.get_full_state()
 
   def compute_reward(self, action):
+    #####################
+    #  PHASE COST TERMS #
+    #####################
+    phase_cost = np.abs(action[-1])
+
     #####################
     # HEIGHT COST TERMS #
     #####################
@@ -498,9 +488,10 @@ class CassieEnv_v2:
              0.250 * np.exp(-(orientation_error + foot_err)) + \
              0.200 * np.exp(-foot_frc_err) +                   \
              0.200 * np.exp(-x_vel) +                          \
-             0.125 * np.exp(-pelvis_acc) +                     \
+             0.100 * np.exp(-pelvis_acc) +                     \
              0.100 * np.exp(-y_vel) +                          \
-             0.075 * np.exp(-pelvis_hgt) +                     \
+             0.050 * np.exp(-phase_cost) +                     \
+             0.050 * np.exp(-pelvis_hgt) +                     \
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
@@ -542,30 +533,6 @@ class CassieEnv_v2:
       return 1 + slope * (phi + saturation - 1)
     else:
       return 1.0
-
-
-  def bound_freq(self, speed, freq=None, generate_new=False):
-    lower = np.interp(np.abs(speed), (0, 3), (0.9, 1.5))
-    upper = np.interp(np.abs(speed), (2, 3), (1.5, 1.7))
-
-    if generate_new:
-      freq = np.random.uniform(lower, upper)
-    elif freq is None:
-      freq = self.phase_add / self.default_simrate
-    freq = np.clip(freq, lower, upper)
-
-    return freq
-
-  def bound_ratio(self, speed, ratio=None):
-    lower = np.interp(np.abs(speed), (0, 2), (self.min_swing_ratio, self.max_swing_ratio))
-    upper = self.max_swing_ratio
-
-    if ratio is None:
-      ratio = np.random.uniform(lower, upper)
-
-    ratio = np.clip(ratio, lower, upper)
-
-    return ratio
 
   def get_full_state(self):
       qpos = np.copy(self.sim.qpos())
