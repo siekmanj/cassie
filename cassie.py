@@ -81,15 +81,15 @@ class CassieEnv_v2:
     self.max_pitch_incline = 0.0
     self.max_roll_incline = 0.0
 
-    self.encoder_noise = 0.008
+    self.encoder_noise = 0.005
 
     self.damping_low = 0.3
     self.damping_high = 5.0
 
     self.mass_low = 0.5
-    self.mass_high = 1.75
+    self.mass_high = 1.5
 
-    self.fric_low = 0.4
+    self.fric_low = 0.6
     self.fric_high = 1.1
 
     self.speed       = 0
@@ -324,7 +324,7 @@ class CassieEnv_v2:
       qpos[1] = 0
       qpos[2] -= 1
       qpos[0:3] = self.check_step(*qpos[0:3])
-      qpos[2] += 1
+      qpos[2] += 1.01
       self.sim.set_qpos(qpos)
 
       self.cassie_state = self.sim.step_pd(self.u)
