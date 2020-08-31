@@ -183,11 +183,7 @@ class CassieEnv_v2:
         self.phase = self.phase % self.phase_len - 1
         self.counter += 1
 
-    reward = self.compute_reward(action)
-
-    done = False
-    if reward < 0.3:
-        done = True
+    reward, done = self.compute_reward(action)
 
     if np.random.randint(300) == 0: # random changes to orientation
       self.orient_add += np.random.uniform(-self.max_orient_change, self.max_orient_change)
@@ -458,13 +454,6 @@ class CassieEnv_v2:
     right_penalty = right_frc_penalty + right_vel_penalty
     foot_frc_err  = left_penalty + right_penalty
 
-    # Penalty which punishes foot heights too far from the commanded apex
-    lhgt = sim_height + self.cassie_state.leftFoot.position[:][2]
-    rhgt = sim_height + self.cassie_state.rightFoot.position[:][2]
-
-    #foot_height_err = 6 * (clock1_swing * np.abs(lhgt - self.foot_height) + \
-    #                       clock2_swing * np.abs(rhgt - self.foot_height))
-
     ########################
     # JERKINESS COST TERMS #
     ########################
@@ -483,6 +472,10 @@ class CassieEnv_v2:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
     pelvis_acc = 0.15 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
+    if np.exp(-(orientation_error + foot_err)) < 0.7:
+        done = True
+    else:
+        done = False
 
     reward = 0.000 + \
              0.250 * np.exp(-(orientation_error + foot_err)) + \
@@ -495,7 +488,7 @@ class CassieEnv_v2:
              0.025 * np.exp(-ctrl_penalty) +                   \
              0.025 * np.exp(-torque_penalty)
 
-    return reward
+    return reward, done
 
   def get_friction(self):
     return np.hstack([self.sim.get_geom_friction()[0]])
