@@ -668,14 +668,15 @@ class CassieEnv_v2:
     idxs = [-5, -6, 7, 8, 9, 
           -0.1, -1, 2, 3, 4]
 
-    if actiondim > 10:
+    if actiondim > 11:
       idxs += [-15, -16, 17, 18, 19,
                -10, -11, 12, 13, 14]
 
-    if actiondim > 20:
+    if actiondim > 22:
       idxs += [-25, -26, 27, 28, 29,
                -20, -21, 22, 23, 24]
  
+    idxs += [len(idxs)]
     for idx, i in enumerate(idxs):
       mirror_act[:,idx] = (np.sign(i) * action[:,abs(int(i))])
     if return_as_1d:
