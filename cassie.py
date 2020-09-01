@@ -349,7 +349,7 @@ class CassieEnv_v2:
     #####################
     #  PHASE COST TERMS #
     #####################
-    phase_cost = np.abs(action[-1])
+    phase_cost = np.abs(action[-1])/4
 
     #####################
     # HEIGHT COST TERMS #
