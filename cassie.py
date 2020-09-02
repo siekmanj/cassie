@@ -67,7 +67,7 @@ class CassieEnv_v2:
 
     self.offset = np.array([0.0045, 0.0, 0.4973, -1.1997, -1.5968, 0.0045, 0.0, 0.4973, -1.1997, -1.5968])
 
-    self.max_orient_change = 0.2
+    self.max_orient_change = 0.1
 
     self.max_speed = 3.0
     self.min_speed = -0.5
@@ -174,7 +174,7 @@ class CassieEnv_v2:
     for _ in range(simrate):
         self.step_simulation(action[:-1])
 
-    self.phase_add = int(self.default_simrate * np.exp(action[-1]/5))
+    self.phase_add = int(self.default_simrate * np.exp(action[-1]))
 
     self.time  += 1
     self.phase += self.phase_add
@@ -472,7 +472,7 @@ class CassieEnv_v2:
       ctrl_penalty = 5 * sum(np.abs(self.last_action - action)) / len(action)
 
     pelvis_acc = 0.15 * (np.abs(self.cassie_state.pelvis.rotationalVelocity[:]).sum() + np.abs(self.cassie_state.pelvis.translationalAcceleration[:]).sum())
-    if np.exp(-(orientation_error + foot_err)) < 0.7:
+    if np.exp(-(orientation_error + foot_err)) < 0.8:
         done = True
     else:
         done = False
