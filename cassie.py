@@ -72,7 +72,7 @@ class CassieEnv_v2:
     self.max_side_speed  = 0.3
     self.min_side_speed  = -0.3
 
-    self.max_step_freq = 1.5
+    self.max_step_freq = 1.1
     self.min_step_freq = 0.9
 
     self.max_height = 1.00
@@ -316,7 +316,7 @@ class CassieEnv_v2:
           self.motor_encoder_noise = np.zeros(10)
           self.joint_encoder_noise = np.zeros(6)
 
-      self.create_stairs(np.random.uniform(-1, 1), np.random.uniform(0.25, 1.0), np.random.uniform(0.005, 0.05), height=np.random.choice(a=[1,2,3,4,5,6,7]))
+      self.create_stairs(np.random.uniform(-1, 1), np.random.uniform(0.20, 1.0), np.random.uniform(0.005, 0.15), height=np.random.choice(a=[1,2,3,4,5,6,7]))
       self.sim.set_const()
 
       qpos = self.sim.qpos()
