@@ -159,10 +159,11 @@ class CassieEnv_v2:
         self.u.leftLeg.motorPd.dTarget[i]  = 0
         self.u.rightLeg.motorPd.dTarget[i] = 0
 
-    if self.time > self.blackout_until:
-        self.cassie_state = self.sim.step_pd(self.u)
-    else:
-        self.sim.step_pd(self.u)
+    #if self.time > self.blackout_until:
+    #    self.cassie_state = self.sim.step_pd(self.u)
+    #else:
+    #    self.sim.step_pd(self.u)
+    self.cassie_state = self.sim.step_pd(self.u)
 
   def step(self, action):
 
@@ -222,8 +223,8 @@ class CassieEnv_v2:
 
       #self.ratio = self.bound_ratio(self.speed)
 
-    if np.random.randint(100) == 0:
-      self.blackout_until = self.time + np.random.randint(3, 9)
+    #if np.random.randint(100) == 0:
+    #  self.blackout_until = self.time + np.random.randint(3, 9)
 
     state = self.get_full_state() 
 
