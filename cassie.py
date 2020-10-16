@@ -159,11 +159,11 @@ class CassieEnv_v2:
         self.u.leftLeg.motorPd.dTarget[i]  = 0
         self.u.rightLeg.motorPd.dTarget[i] = 0
 
+    self.cassie_state = self.sim.step_pd(self.u)
     #if self.time > self.blackout_until:
     #    self.cassie_state = self.sim.step_pd(self.u)
     #else:
     #    self.sim.step_pd(self.u)
-    self.cassie_state = self.sim.step_pd(self.u)
 
   def step(self, action):
 
@@ -190,8 +190,12 @@ class CassieEnv_v2:
     reward = self.compute_reward(action)
     done = self.done
 
-    if np.random.randint(300) == 0: # random changes to orientation
-      self.orient_add += np.random.uniform(-self.max_orient_change, self.max_orient_change)
+  
+    if np.random.randint(100) == 0:  # random changes to orientation
+        self.current_turn_rate = np.random.uniform(-0.0075 * np.pi, 0.0075 * np.pi)
+    if np.random.randint(100) == 0:
+          self.current_turn_rate = 0
+    self.orient_add += self.current_turn_rate
 
     if np.random.randint(300) == 0: # random changes to commanded height
       self.height = np.random.uniform(self.min_height, self.max_height)
@@ -248,7 +252,8 @@ class CassieEnv_v2:
       self.phase = random.randint(0, self.phase_len)
       self.time = 0
       self.counter = 0
-      self.blackout_until = -1
+      #self.blackout_until = -1
+      self.current_turn_rate = 0
 
       self.state_history = [np.zeros(self._obs) for _ in range(self.history+1)]
 
