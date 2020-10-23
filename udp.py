@@ -113,11 +113,11 @@ def run_udp(policy_files):
   print("Policy is a: {}".format(policy.__class__.__name__))
   time.sleep(1)
 
-  time_log   = [] # time stamp
-  input_log  = [] # network inputs
-  output_log = [] # network outputs 
-  state_log  = [] # cassie state
-  target_log = [] # PD target log
+  #time_log   = [] # time stamp
+  #input_log  = [] # network inputs
+  #output_log = [] # network outputs 
+  #state_log  = [] # cassie state
+  #target_log = [] # PD target log
 
   clock_based = env.clock
   no_delta = True
@@ -309,33 +309,33 @@ def run_udp(policy_files):
                 logged = True
                 
                 #log(ESTOP_count)
-                data = {"time": time_log,
-                        "output": output_log,
-                        "input": input_log,
-                        "state": state_log,
-                        "target": target_log}
+                #data = {"time": time_log,
+                #        "output": output_log,
+                #        "input": input_log,
+                #        "state": state_log,
+                #        "target": target_log}
 
-                
-                fname = 'log_' + \
-                        datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H:%M') + \
-                        '_' + str(datetime.timedelta(seconds=round(tt))) + \
-                        '.pkl'
-                print()
-                print(fname)
-                print()
+                #
+                #fname = 'log_' + \
+                #        datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d_%H:%M') + \
+                #        '_' + str(datetime.timedelta(seconds=round(tt))) + \
+                #        '.pkl'
+                #print()
+                #print(fname)
+                #print()
 
-                filep = open(fname, 'wb')
-                pickle.dump(data, filep)
-                filep.close()
+                #filep = open(fname, 'wb')
+                #pickle.dump(data, filep)
+                #filep.close()
 
                 ESTOP_count += 1
 
-                # Clear out logs
-                time_log   = []
-                input_log  = []
-                output_log = []
-                state_log  = []
-                target_log = []
+                ## Clear out logs
+                #time_log   = []
+                #input_log  = []
+                #output_log = []
+                #state_log  = []
+                #target_log = []
                 t0 = time.monotonic()
 
             if hasattr(policy, 'init_hidden_state'):
@@ -440,11 +440,11 @@ def run_udp(policy_files):
               u.rightLeg.motorPd.pTarget[i] = target[i+5]
 
           cassie.send_pd(u)
-        time_log.append(time.time())
-        state_log.append(state)
-        input_log.append(RL_state)
-        output_log.append(env_action)
-        target_log.append(target)
+        #time_log.append(time.time())
+        #state_log.append(state)
+        #input_log.append(RL_state)
+        #output_log.append(env_action)
+        #target_log.append(target)
         
         torques   = torques * 0.95 + 0.05 * np.abs(state.motor.torque[:]).sum()
         phase_add = int(env.simrate * env.bound_freq(speed, freq=phase_add/env.simrate))
